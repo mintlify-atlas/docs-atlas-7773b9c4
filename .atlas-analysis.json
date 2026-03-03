@@ -1,0 +1,179 @@
+{
+  "projectType": "saas",
+  "projectName": "Postiz",
+  "projectDescription": "An open-source social media scheduling platform with AI features, supporting 30+ platforms including X, Instagram, LinkedIn, YouTube, and more.",
+  "theme": "mint",
+  "primaryColor": "#7c3aed",
+  "lightColor": "#a78bfa",
+  "darkColor": "#5b21b6",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/scheduling",
+              "features/calendar",
+              "features/analytics",
+              "features/ai-features",
+              "features/team-collaboration",
+              "features/media-library"
+            ]
+          },
+          {
+            "group": "Social Platforms",
+            "pages": [
+              "platforms/overview",
+              "platforms/x-twitter",
+              "platforms/instagram",
+              "platforms/facebook",
+              "platforms/linkedin",
+              "platforms/youtube",
+              "platforms/tiktok",
+              "platforms/reddit",
+              "platforms/discord",
+              "platforms/slack",
+              "platforms/bluesky",
+              "platforms/mastodon",
+              "platforms/threads",
+              "platforms/pinterest"
+            ]
+          },
+          {
+            "group": "Self-Hosting",
+            "pages": [
+              "self-hosting/overview",
+              "self-hosting/docker-compose",
+              "self-hosting/environment-variables",
+              "self-hosting/database-setup",
+              "self-hosting/authentication",
+              "self-hosting/storage-configuration"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/oauth-apps",
+              "configuration/email-setup",
+              "configuration/ai-integration",
+              "configuration/billing-stripe",
+              "configuration/short-links"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "api/overview",
+              "api/authentication",
+              "api/rate-limits"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/posts/create-post",
+              "api/posts/list-posts",
+              "api/posts/delete-post",
+              "api/integrations/list-integrations",
+              "api/media/upload-media"
+            ]
+          },
+          {
+            "group": "SDK & CLI",
+            "pages": [
+              "api/sdk/nodejs-sdk",
+              "api/cli/overview",
+              "api/cli/commands"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developer Guide",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "development/architecture",
+              "development/monorepo-structure",
+              "development/tech-stack"
+            ]
+          },
+          {
+            "group": "Backend Development",
+            "pages": [
+              "development/backend/overview",
+              "development/backend/controllers",
+              "development/backend/services",
+              "development/backend/database-schema"
+            ]
+          },
+          {
+            "group": "Frontend Development",
+            "pages": [
+              "development/frontend/overview",
+              "development/frontend/components",
+              "development/frontend/routing",
+              "development/frontend/styling"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "development/integrations/creating-provider",
+              "development/integrations/oauth-flow",
+              "development/integrations/testing"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "development/contributing",
+              "development/code-standards",
+              "development/testing"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Schedule posts to 30+ social media platforms",
+    "AI-powered content generation and optimization",
+    "Visual calendar with drag-and-drop scheduling",
+    "Analytics and performance tracking",
+    "Team collaboration with roles and permissions",
+    "Media library with cloud storage",
+    "Public REST API with Node.js SDK",
+    "CLI tool for automation",
+    "Multi-tenant architecture",
+    "Self-hosted or cloud deployment"
+  ],
+  "publicApiSurface": [
+    "POST /public/v1/posts - Create scheduled post",
+    "GET /public/v1/posts - List all posts",
+    "DELETE /public/v1/posts/:id - Delete post",
+    "GET /public/v1/integrations - List connected integrations",
+    "POST /public/v1/upload - Upload media file",
+    "@postiz/node SDK - Node.js client library",
+    "postiz CLI - Command-line tool",
+    "Temporal workflows for background jobs",
+    "OAuth endpoints for platform authentication",
+    "Webhook endpoints for platform events"
+  ]
+}
