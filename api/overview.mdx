@@ -91,6 +91,40 @@ Error responses include a descriptive message:
 }
 ```
 
+## Available Endpoints
+
+The Public API provides the following endpoints:
+
+### Posts
+- `POST /public/v1/posts` - Create and schedule posts
+- `GET /public/v1/posts` - List all posts with filtering
+- `DELETE /public/v1/posts/:id` - Delete a specific post
+- `DELETE /public/v1/posts/group/:group` - Delete all posts in a group
+- `GET /public/v1/posts/:id/missing` - Get missing content requirements
+- `PUT /public/v1/posts/:id/release-id` - Update post release ID
+
+### Media
+- `POST /public/v1/upload` - Upload media files
+- `POST /public/v1/upload-from-url` - Upload media from URL
+- `POST /public/v1/generate-video` - Generate AI videos
+- `POST /public/v1/video/function` - Video processing functions
+
+### Integrations
+- `GET /public/v1/integrations` - List connected platforms
+- `GET /public/v1/is-connected` - Check connection status
+- `GET /public/v1/integration-settings/:id` - Get platform-specific settings
+
+### Analytics & Notifications
+- `GET /public/v1/analytics/:integration` - Get platform analytics
+- `GET /public/v1/notifications` - List notifications
+
+### Utilities
+- `GET /public/v1/find-slot/:id` - Find next available time slot
+
+<Info>
+  Core endpoints are documented in detail in the Endpoints section. Advanced endpoints are available but may have limited documentation.
+</Info>
+
 ## Next Steps
 
 <CardGroup cols={2}>
