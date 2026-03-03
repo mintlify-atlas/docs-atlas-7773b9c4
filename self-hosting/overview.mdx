@@ -1,0 +1,183 @@
+---
+title: Self-Hosting Overview
+description: Learn how to self-host Postiz on your own infrastructure with Docker Compose
+---
+
+# Self-Hosting Overview
+
+Postiz is a powerful open-source social media scheduling platform that you can self-host on your own infrastructure. This guide will help you get started with deploying Postiz using Docker Compose.
+
+## What is Postiz?
+
+Postiz is your ultimate AI social media scheduling tool that allows you to:
+
+- Schedule posts across 28+ social media platforms and channels
+- Measure your performance with analytics
+- Collaborate with team members
+- Automate workflows with API integrations (N8N, Make.com, Zapier)
+- Manage media libraries and content calendars
+
+## System Requirements
+
+<Note>
+At the moment, there is no difference between the hosted version and the self-hosted version. You get the full power of Postiz!
+</Note>
+
+### Minimum Requirements
+
+- **Docker**: Version 20.10 or higher
+- **Docker Compose**: Version 2.0 or higher
+- **RAM**: 4GB minimum (8GB recommended for production)
+- **Storage**: 20GB minimum for application and databases
+- **CPU**: 2 cores minimum (4 cores recommended)
+
+### Supported Platforms
+
+Postiz can be deployed on:
+
+- Linux (Ubuntu 20.04+, Debian 11+, CentOS 8+)
+- macOS (with Docker Desktop)
+- Windows (with Docker Desktop or WSL2)
+- Cloud platforms (AWS, GCP, Azure, DigitalOcean, etc.)
+
+## Architecture Overview
+
+Postiz uses a modern microservices architecture:
+
+<Steps>
+  <Step title="Frontend (Next.js)">
+    React-based user interface built with Next.js and Vite
+  </Step>
+  
+  <Step title="Backend API (NestJS)">
+    RESTful API server handling all business logic
+  </Step>
+  
+  <Step title="Orchestrator (Temporal)">
+    Background job processing and workflow management
+  </Step>
+  
+  <Step title="Database (PostgreSQL)">
+    Primary data storage for posts, users, and analytics
+  </Step>
+  
+  <Step title="Cache (Redis)">
+    Session management and caching layer
+  </Step>
+</Steps>
+
+## Tech Stack
+
+Postiz is built with modern, production-ready technologies:
+
+- **Monorepo**: Pnpm workspaces
+- **Frontend**: Next.js (React) with Vite
+- **Backend**: NestJS (Node.js)
+- **Database**: PostgreSQL with Prisma ORM
+- **Job Queue**: Temporal for workflow orchestration
+- **Cache**: Redis 7.2
+- **Notifications**: Resend (optional)
+
+## What You'll Need
+
+Before starting your self-hosted deployment, gather the following:
+
+### Required
+
+- Server or VM with Docker installed
+- Domain name (for production deployments)
+- PostgreSQL database credentials
+- Redis instance
+
+### Optional (for full functionality)
+
+- **Storage**: Cloudflare R2 account (for media uploads)
+- **Email**: Resend API key (for user activation emails)
+- **Social Media OAuth Apps**: API credentials for platforms you want to support
+  - X (Twitter), LinkedIn, Reddit, GitHub
+  - Facebook, Instagram, Threads
+  - YouTube, TikTok, Pinterest
+  - Discord, Slack, Mastodon
+  - And more!
+- **AI Features**: OpenAI API key
+- **Payments**: Stripe keys (if offering paid features)
+
+## Deployment Options
+
+<CardGroup cols={2}>
+  <Card title="Docker Compose" icon="docker" href="/self-hosting/docker-compose">
+    Quick setup with pre-configured services (recommended for most users)
+  </Card>
+  
+  <Card title="Environment Variables" icon="gear" href="/self-hosting/environment-variables">
+    Complete reference for all configuration options
+  </Card>
+  
+  <Card title="Database Setup" icon="database" href="/self-hosting/database-setup">
+    PostgreSQL and Redis configuration guide
+  </Card>
+  
+  <Card title="Authentication" icon="lock" href="/self-hosting/authentication">
+    OAuth setup and user authentication
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Security
+
+- JWT-based authentication
+- OAuth 2.0 support for generic providers (Authentik, Keycloak, etc.)
+- Environment-based secrets management
+- Optional user registration disable
+
+### Scalability
+
+- Horizontal scaling with multiple container instances
+- Redis caching for improved performance
+- Temporal for distributed workflow execution
+- PostgreSQL with connection pooling
+
+### Flexibility
+
+- Local or cloud storage (Cloudflare R2)
+- Multiple short link service integrations (Dub, Short.io, Kutt, LinkDrip)
+- Extensible via REST API
+- Custom OAuth provider support
+
+## License
+
+<Warning>
+Postiz is licensed under AGPL-3.0. This means if you modify the source code and run it as a service, you must make your modifications available under the same license.
+</Warning>
+
+The repository's source code is available under the [AGPL-3.0 license](https://opensource.org/license/agpl-v3).
+
+## Support and Community
+
+Get help and connect with other Postiz users:
+
+- [Documentation](https://docs.postiz.com)
+- [Discord Community](https://discord.postiz.com) (developers only)
+- [YouTube Tutorials](https://youtube.com/@postizofficial)
+- [GitHub Issues](https://github.com/gitroomhq/postiz-app/issues)
+
+## Next Steps
+
+<Steps>
+  <Step title="Install Docker">
+    Ensure Docker and Docker Compose are installed on your system
+  </Step>
+  
+  <Step title="Follow the Docker Compose Guide">
+    Set up Postiz using our [Docker Compose setup guide](/self-hosting/docker-compose)
+  </Step>
+  
+  <Step title="Configure Environment Variables">
+    Review the [environment variables reference](/self-hosting/environment-variables)
+  </Step>
+  
+  <Step title="Set Up OAuth">
+    Configure social media integrations in the [authentication guide](/self-hosting/authentication)
+  </Step>
+</Steps>

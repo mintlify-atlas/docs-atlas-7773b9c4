@@ -1,0 +1,415 @@
+---
+title: Frontend Development Overview
+description: Understanding frontend architecture and development patterns in Postiz
+---
+
+## Overview
+
+The Postiz frontend is built with **React 18**, **Vite**, and **Next.js 14 App Router**. It emphasizes custom components, SWR for data fetching, and Tailwind CSS for styling.
+
+<Warning>
+**Critical Rule**: Never install frontend components from npm. Focus on writing native, custom components.
+</Warning>
+
+## Technology Stack
+
+| Technology | Version | Purpose |
+|------------|---------|----------|
+| **React** | 18.3.1 | UI library |
+| **Next.js** | 14.2.35 | Framework & routing |
+| **Vite** | 6.3.5 | Build tool |
+| **SWR** | 2.2.5 | Data fetching |
+| **Tailwind CSS** | 3.4.17 | Styling |
+| **TypeScript** | 5.5.4 | Type safety |
+
+## Project Structure
+
+```
+apps/frontend/src/
+├── app/
+│   ├── (app)/                  # Protected app routes
+│   │   ├── (site)/             # Main site routes
+│   │   │   ├── analytics/
+│   │   │   ├── media/
+│   │   │   ├── launches/
+│   │   │   ├── settings/
+│   │   │   └── layout.tsx
+│   │   └── layout.tsx
+│   ├── auth/                  # Authentication routes
+│   ├── api/                   # API routes (Next.js)
+│   ├── colors.scss            # Color variables
+│   └── global.scss            # Global styles
+├── components/
+│   ├── ui/                    # UI components
+│   ├── layout/                # Layout components
+│   ├── calendar/              # Calendar components
+│   ├── analytics/             # Analytics components
+│   └── ... (feature components)
+├── middleware.ts             # Next.js middleware
+└── instrumentation.ts        # Instrumentation
+```
+
+## Key Conventions
+
+### SWR Data Fetching
+
+<Note>
+**Critical**: Each SWR hook must be in a separate function to comply with React hooks rules. Never use `eslint-disable-next-line` for hooks violations.
+</Note>
+
+**Valid Pattern:**
+```typescript
+// ✓ Correct - each hook is separate
+const useCommunity = () => {
+  return useSWR<CommunitiesListResponse>("communities", getCommunities);
+};
+
+const useProviders = () => {
+  return useSWR<ProvidersListResponse>("providers", getProviders);
+};
+```
+
+**Invalid Pattern:**
+```typescript
+// ✗ Wrong - never return multiple hooks
+const useCommunity = () => {
+  return {
+    communities: () => useSWR<CommunitiesListResponse>("communities", getCommunities),
+    providers: () => useSWR<ProvidersListResponse>("providers", getProviders),
+  };
+};
+```
+
+### Custom Fetch Hook
+
+Always use the `useFetch` hook from helpers:
+
+```typescript
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch.tsx';
+
+function MyComponent() {
+  const fetch = useFetch();
+  
+  const loadData = async () => {
+    const data = await fetch('/api/posts');
+    return data;
+  };
+}
+```
+
+### Component Organization
+
+<Info>
+Many UI components live in `/apps/frontend/src/components/ui`. Check existing components before creating new ones to maintain design consistency.
+</Info>
+
+## Styling Guidelines
+
+### Tailwind Configuration
+
+Before writing any component, review these files:
+- `/apps/frontend/src/app/colors.scss` - Color variables
+- `/apps/frontend/src/app/global.scss` - Global styles  
+- `/apps/frontend/tailwind.config.js` - Tailwind config
+
+<Warning>
+All `--color-custom*` variables are deprecated. Do not use them. Use the new color system instead.
+</Warning>
+
+### Color System
+
+Use CSS custom properties defined in `colors.scss`:
+
+```tsx
+// ✓ Correct - use new color variables
+<div className="bg-newBgColor text-newTextColor">
+  <button className="bg-btnPrimary text-btnText">
+    Click me
+  </button>
+</div>
+
+// ✗ Wrong - deprecated colors
+<div className="bg-customColor1 text-customColor2">
+  ...
+</div>
+```
+
+**Available Color Variables:**
+```scss
+--color-primary
+--color-secondary
+--new-bgColor
+--new-bgColorInner
+--new-textColor
+--new-btn-primary
+--new-btn-simple
+--new-btn-text
+--new-border
+--new-separator
+```
+
+### Tailwind Classes
+
+```tsx
+// Layout
+<div className="flex flex-col gap-4 p-6">
+
+// Responsive
+<div className="mobile:hidden tablet:flex">
+
+// Custom screens (from tailwind.config.js)
+<div className="custom:text-sm tablet:text-base">
+
+// Colors
+<div className="bg-newBgColor border-newBorder text-newTextColor">
+```
+
+## App Router Structure
+
+### Route Groups
+
+Next.js 14 uses route groups with parentheses:
+
+```
+app/
+├── (app)/           # Protected routes
+│   └── (site)/      # Main app routes
+│       ├── analytics/
+│       ├── media/
+│       └── settings/
+├── auth/            # Public auth routes
+└── api/             # API routes
+```
+
+### Layout Pattern
+
+```typescript layout.tsx
+import { ReactNode } from 'react';
+import '../global.scss';
+import LayoutContext from '@gitroom/frontend/components/layout/layout.context';
+
+export default async function AppLayout({ children }: { children: ReactNode }) {
+  return (
+    <html>
+      <body className="dark text-primary !bg-primary">
+        <LayoutContext>
+          {children}
+        </LayoutContext>
+      </body>
+    </html>
+  );
+}
+```
+
+### Page Component
+
+```typescript page.tsx
+'use client';
+
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch.tsx';
+import useSWR from 'swr';
+
+export default function AnalyticsPage() {
+  const fetch = useFetch();
+  
+  const { data, error, isLoading } = useSWR(
+    'analytics',
+    () => fetch('/api/analytics')
+  );
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error loading analytics</div>;
+
+  return (
+    <div className="flex flex-col gap-6 p-6">
+      <h1 className="text-2xl font-bold">Analytics</h1>
+      {/* Component content */}
+    </div>
+  );
+}
+```
+
+## State Management
+
+### SWR for Server State
+
+```typescript
+import useSWR from 'swr';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch.tsx';
+
+const usePosts = () => {
+  const fetch = useFetch();
+  
+  return useSWR('posts', async () => {
+    return await fetch('/api/posts');
+  });
+};
+
+function PostsList() {
+  const { data: posts, error, mutate } = usePosts();
+  
+  const createPost = async (postData) => {
+    await fetch('/api/posts', {
+      method: 'POST',
+      body: JSON.stringify(postData),
+    });
+    
+    // Revalidate
+    mutate();
+  };
+}
+```
+
+### Zustand for Client State
+
+For local UI state, use Zustand:
+
+```typescript
+import { create } from 'zustand';
+
+interface AppState {
+  sidebarOpen: boolean;
+  toggleSidebar: () => void;
+}
+
+const useAppStore = create<AppState>((set) => ({
+  sidebarOpen: true,
+  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+}));
+
+function Sidebar() {
+  const { sidebarOpen, toggleSidebar } = useAppStore();
+  
+  return (
+    <aside className={sidebarOpen ? 'block' : 'hidden'}>
+      {/* Sidebar content */}
+    </aside>
+  );
+}
+```
+
+## Component Patterns
+
+### Client vs Server Components
+
+```typescript
+// Server Component (default)
+export default async function Page() {
+  const data = await fetchData(); // Can fetch directly
+  return <div>{data.title}</div>;
+}
+
+// Client Component (use 'use client')
+'use client';
+
+import { useState } from 'react';
+
+export default function InteractiveComponent() {
+  const [count, setCount] = useState(0);
+  return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
+```
+
+### Custom Components
+
+Always build custom components instead of using external libraries:
+
+```typescript Button.tsx
+interface ButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary';
+  disabled?: boolean;
+}
+
+export function Button({ 
+  children, 
+  onClick, 
+  variant = 'primary',
+  disabled 
+}: ButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`
+        px-4 py-2 rounded-lg font-medium transition-colors
+        ${variant === 'primary' ? 'bg-btnPrimary text-btnText' : 'bg-btnSimple text-btnText'}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}
+      `}
+    >
+      {children}
+    </button>
+  );
+}
+```
+
+## Development Workflow
+
+### Start Development Server
+
+```bash
+pnpm dev:frontend
+```
+
+Runs on `http://localhost:5173` (Vite default)
+
+### Build for Production
+
+```bash
+pnpm build:frontend
+```
+
+### Environment Variables
+
+```bash .env
+NEXT_PUBLIC_BACKEND_URL="http://localhost:3000"
+FRONTEND_URL="http://localhost:5173"
+NEXT_PUBLIC_SENTRY_DSN="..."
+```
+
+<Info>
+Variables prefixed with `NEXT_PUBLIC_` are exposed to the browser.
+</Info>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use custom components">
+    Never install UI component libraries. Build custom components for full control.
+  </Step>
+  
+  <Step title="Follow SWR patterns">
+    Each SWR hook must be in its own function. Never return multiple hooks.
+  </Step>
+  
+  <Step title="Use useFetch hook">
+    Always use the custom `useFetch` hook for API calls.
+  </Step>
+  
+  <Step title="Check color system">
+    Review colors.scss and use new color variables, not deprecated ones.
+  </Step>
+  
+  <Step title="Check existing components">
+    Before creating a component, check components/ui for existing patterns.
+  </Step>
+  
+  <Step title="Run linting from root">
+    Linting can only run from the root directory.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Component Architecture" icon="cubes" href="/development/frontend/components">
+    Learn component patterns and structure
+  </Card>
+  <Card title="Routing Structure" icon="route" href="/development/frontend/routing">
+    Understand Next.js App Router
+  </Card>
+  <Card title="Styling Guide" icon="palette" href="/development/frontend/styling">
+    Master Tailwind CSS styling
+  </Card>
+</CardGroup>

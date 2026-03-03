@@ -1,0 +1,271 @@
+---
+title: 'Slack Integration'
+description: 'Post messages and announcements to Slack channels and threads'
+---
+
+## Overview
+
+Postiz integrates with Slack workspaces to send messages to channels using a Slack bot, with support for rich formatting, media, and threaded conversations.
+
+## Authentication
+
+Slack uses OAuth 2.0 with bot installation.
+
+<Steps>
+  <Step title="Connect Slack">
+    Click "Connect Slack" in Integrations
+  </Step>
+  
+  <Step title="Select Workspace">
+    Choose which Slack workspace to install to
+  </Step>
+  
+  <Step title="Authorize Bot">
+    Grant all requested permissions
+  </Step>
+  
+  <Step title="Select Channel">
+    Choose channel when creating posts
+  </Step>
+</Steps>
+
+### Required Permissions
+
+- `channels:read` - Read public channels
+- `chat:write` - Send messages
+- `users:read` - Read user information
+- `groups:read` - Read private channels
+- `channels:join` - Join channels automatically
+- `chat:write.customize` - Custom name and icon
+
+<Note>
+  Slack bot token is configured via `SLACK_ID` and `SLACK_SECRET` environment variables.
+</Note>
+
+## Supported Features
+
+### Message Features
+
+<Tabs>
+  <Tab title="Text Messages">
+    - **Maximum**: 400,000 characters
+    - Markdown formatting (mrkdwn)
+    - Links, bold, italic, code
+    - Emoji support
+  </Tab>
+  
+  <Tab title="Block Kit Messages">
+    Messages use Slack's Block Kit:
+    - Section blocks for text
+    - Image blocks for media
+    - Rich formatting
+    - Better visual layout
+  </Tab>
+  
+  <Tab title="Custom Appearance">
+    - Custom bot name (uses integration name)
+    - Custom bot icon (uses integration picture)
+    - Appears as your configured bot
+  </Tab>
+</Tabs>
+
+### Channel Types
+
+Post to:
+- Public channels
+- Private channels (if bot is invited)
+
+## Posting Messages
+
+### Message Structure
+
+Messages use Slack's Block Kit format:
+
+<CodeGroup>
+```typescript Message Blocks
+{
+  channel: "C12345678",
+  username: "Your Bot Name",
+  icon_url: "https://example.com/bot-icon.png",
+  blocks: [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: "Your message text with *formatting*"
+      }
+    },
+    {
+      type: "image",
+      image_url: "https://example.com/image.jpg",
+      alt_text: "Image description"
+    }
+  ]
+}
+```
+</CodeGroup>
+
+### Auto-Join Channels
+
+Postiz automatically joins channels before posting:
+
+<Steps>
+  <Step title="Join Request">
+    Bot joins the selected channel
+  </Step>
+  
+  <Step title="Post Message">
+    Send message with blocks and media
+  </Step>
+  
+  <Step title="Get Permalink">
+    Retrieve permanent link to message
+  </Step>
+</Steps>
+
+<Info>
+  The bot must be invited to private channels manually before posting.
+</Info>
+
+## Threading
+
+Create threaded conversations:
+
+<Steps>
+  <Step title="Main Message">
+    Post initial message to channel
+  </Step>
+  
+  <Step title="Thread Reply">
+    Reply using `thread_ts` of main message
+  </Step>
+  
+  <Step title="Additional Replies">
+    Continue thread with same `thread_ts`
+  </Step>
+</Steps>
+
+Thread replies maintain the same formatting and media support as main messages.
+
+## Media Handling
+
+Images are added as separate blocks:
+
+```typescript
+blocks: [
+  {
+    type: "section",
+    text: { type: "mrkdwn", text: "Message" }
+  },
+  {
+    type: "image",
+    image_url: "https://example.com/image1.jpg",
+    alt_text: ""
+  },
+  {
+    type: "image",
+    image_url: "https://example.com/image2.jpg",
+    alt_text: ""
+  }
+]
+```
+
+Multiple images are supported, each as a separate image block.
+
+## Channel Discovery
+
+List available channels:
+
+```typescript
+GET /channels
+
+Returns:
+[
+  {
+    id: "C12345678",
+    name: "general"
+  },
+  {
+    id: "C87654321",
+    name: "announcements"
+  }
+]
+```
+
+Includes both public and private channels the bot can access.
+
+## Permalinks
+
+Each message receives a permalink:
+
+```typescript
+https://workspace.slack.com/archives/C12345678/p1234567890123456
+```
+
+Permanent links work even if message is old or in archived channels.
+
+## Rate Limits
+
+<Info>
+  **Slack Rate Limits:**
+  - 3 concurrent posting jobs
+  - Moderate API rate limits
+  - Tier-based limits per workspace
+  - No strict message count limits
+</Info>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Markdown Formatting">
+    Use Slack's mrkdwn for *bold*, _italic_, and `code`
+  </Card>
+  
+  <Card title="Thread Organization">
+    Use threads to keep channels clean and organized
+  </Card>
+  
+  <Card title="Channel Selection">
+    Post to appropriate channels - use announcements sparingly
+  </Card>
+  
+  <Card title="Bot Identity">
+    Customize bot name and icon to match your brand
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Bot Can't Post">
+    If messages fail:
+    - Verify bot is in workspace
+    - Check bot has `chat:write` permission
+    - Ensure channel exists and bot can access
+    - For private channels, manually invite bot first
+  </Accordion>
+  
+  <Accordion title="Channel Not Listed">
+    If channel doesn't appear:
+    - Bot must be invited to private channels
+    - Channel might be archived
+    - Verify bot has `channels:read` permission
+    - Check workspace permissions
+  </Accordion>
+  
+  <Accordion title="Images Not Showing">
+    Media display issues:
+    - Ensure image URLs are publicly accessible
+    - Check image format is supported
+    - Verify URLs use HTTPS
+    - Images must be hosted externally
+  </Accordion>
+  
+  <Accordion title="Threading Not Working">
+    Thread issues:
+    - Verify original message exists
+    - Check `thread_ts` is correct
+    - Ensure bot has message history access
+    - Original message may have been deleted
+  </Accordion>
+</AccordionGroup>

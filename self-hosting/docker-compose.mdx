@@ -1,0 +1,455 @@
+---
+title: Docker Compose Setup
+description: Deploy Postiz with Docker Compose in minutes
+---
+
+# Docker Compose Setup
+
+The easiest way to deploy Postiz is using Docker Compose. This guide will walk you through setting up a complete Postiz instance with all required services.
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install Docker">
+    Install Docker Engine and Docker Compose on your system:
+    
+    - [Docker Engine](https://docs.docker.com/engine/install/)
+    - [Docker Compose](https://docs.docker.com/compose/install/)
+  </Step>
+  
+  <Step title="Verify Installation">
+    ```bash
+    docker --version
+    docker compose version
+    ```
+  </Step>
+</Steps>
+
+## Quick Start
+
+<Steps>
+  <Step title="Create Project Directory">
+    ```bash
+    mkdir postiz
+    cd postiz
+    ```
+  </Step>
+  
+  <Step title="Download Docker Compose File">
+    ```bash
+    curl -O https://raw.githubusercontent.com/gitroomhq/postiz-app/main/docker-compose.yaml
+    ```
+  </Step>
+  
+  <Step title="Create Dynamic Config Directory">
+    ```bash
+    mkdir -p dynamicconfig
+    ```
+    
+    This directory is required for Temporal configuration.
+  </Step>
+  
+  <Step title="Start Services">
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+  
+  <Step title="Access Postiz">
+    Open your browser and navigate to:
+    
+    ```
+    http://localhost:4007
+    ```
+  </Step>
+</Steps>
+
+<Info>
+The first startup may take a few minutes as Docker downloads all the required images and initializes the databases.
+</Info>
+
+## Docker Compose Configuration
+
+The `docker-compose.yaml` file configures all services needed to run Postiz:
+
+### Services Overview
+
+<CodeGroup>
+```yaml docker-compose.yaml
+services:
+  # Main Postiz application
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:latest
+    container_name: postiz
+    restart: always
+    ports:
+      - "4007:5000"
+    depends_on:
+      postiz-postgres:
+        condition: service_healthy
+      postiz-redis:
+        condition: service_healthy
+
+  # PostgreSQL database
+  postiz-postgres:
+    image: postgres:17-alpine
+    container_name: postiz-postgres
+    restart: always
+
+  # Redis cache
+  postiz-redis:
+    image: redis:7.2
+    container_name: postiz-redis
+    restart: always
+
+  # Temporal workflow engine
+  temporal:
+    image: temporalio/auto-setup:1.28.1
+    container_name: temporal
+    ports:
+      - '7233:7233'
+
+  # Temporal UI (optional)
+  temporal-ui:
+    image: temporalio/ui:2.34.0
+    container_name: temporal-ui
+    ports:
+      - '8080:8080'
+```
+</CodeGroup>
+
+### Service Descriptions
+
+<ParamField path="postiz" type="service">
+  Main application container running the Postiz frontend and backend
+  
+  - **Image**: `ghcr.io/gitroomhq/postiz-app:latest`
+  - **Port**: `4007:5000` (host:container)
+  - **Volumes**: 
+    - `/config/` - Application configuration
+    - `/uploads/` - Media uploads (if using local storage)
+</ParamField>
+
+<ParamField path="postiz-postgres" type="service">
+  PostgreSQL 17 database for persistent data storage
+  
+  - **Image**: `postgres:17-alpine`
+  - **Healthcheck**: Ensures database is ready before starting Postiz
+  - **Volume**: `postgres-volume:/var/lib/postgresql/data`
+</ParamField>
+
+<ParamField path="postiz-redis" type="service">
+  Redis cache for sessions and temporary data
+  
+  - **Image**: `redis:7.2`
+  - **Healthcheck**: Ensures Redis is responding before starting Postiz
+  - **Volume**: `postiz-redis-data:/data`
+</ParamField>
+
+<ParamField path="temporal" type="service">
+  Temporal workflow orchestration engine for background jobs
+  
+  - **Image**: `temporalio/auto-setup:1.28.1`
+  - **Port**: `7233:7233`
+  - **Dependencies**: temporal-postgresql, temporal-elasticsearch
+</ParamField>
+
+## Environment Variables
+
+The Docker Compose file includes essential environment variables. Here are the key ones:
+
+### Required Settings
+
+```yaml
+MAIN_URL: 'http://localhost:4007'
+FRONTEND_URL: 'http://localhost:4007'
+NEXT_PUBLIC_BACKEND_URL: 'http://localhost:4007/api'
+JWT_SECRET: 'random string that is unique to every install'
+DATABASE_URL: 'postgresql://postiz-user:postiz-password@postiz-postgres:5432/postiz-db-local'
+REDIS_URL: 'redis://postiz-redis:6379'
+```
+
+<Warning>
+**Security**: Change the `JWT_SECRET` to a random string! This is critical for security. Generate a strong random string with:
+
+```bash
+openssl rand -base64 32
+```
+</Warning>
+
+### Database Credentials
+
+```yaml
+DATABASE_URL: 'postgresql://postiz-user:postiz-password@postiz-postgres:5432/postiz-db-local'
+```
+
+<Warning>
+For production, change the default PostgreSQL credentials:
+
+```yaml
+postiz-postgres:
+  environment:
+    POSTGRES_PASSWORD: your-strong-password
+    POSTGRES_USER: your-username
+    POSTGRES_DB: postiz-db
+```
+
+Update the `DATABASE_URL` accordingly.
+</Warning>
+
+## Persistent Storage
+
+Postiz uses Docker volumes to persist data:
+
+```yaml
+volumes:
+  postgres-volume:      # PostgreSQL database files
+  postiz-redis-data:    # Redis persistence
+  postiz-config:        # Application configuration
+  postiz-uploads:       # Media uploads (local storage)
+```
+
+### Backup Volumes
+
+To backup your data:
+
+```bash
+# Backup PostgreSQL
+docker compose exec postiz-postgres pg_dump -U postiz-user postiz-db-local > backup.sql
+
+# Backup uploads directory
+docker run --rm -v postiz_postiz-uploads:/uploads -v $(pwd):/backup alpine tar czf /backup/uploads-backup.tar.gz -C /uploads .
+```
+
+## Port Configuration
+
+By default, Postiz exposes these ports:
+
+| Service | Host Port | Container Port | Description |
+|---------|-----------|----------------|-------------|
+| Postiz | 4007 | 5000 | Main application |
+| Temporal | 7233 | 7233 | Temporal gRPC |
+| Temporal UI | 8080 | 8080 | Temporal web UI |
+
+### Changing the Default Port
+
+To run Postiz on a different port (e.g., 8080):
+
+```yaml
+postiz:
+  ports:
+    - "8080:5000"  # Changed from 4007:5000
+  environment:
+    MAIN_URL: 'http://localhost:8080'
+    FRONTEND_URL: 'http://localhost:8080'
+    NEXT_PUBLIC_BACKEND_URL: 'http://localhost:8080/api'
+```
+
+## Production Deployment
+
+For production deployments, consider these additional configurations:
+
+### 1. Use Environment File
+
+Create a `.env` file instead of inline environment variables:
+
+```yaml
+postiz:
+  env_file:
+    - .env
+```
+
+<Tip>
+See the [Environment Variables](/self-hosting/environment-variables) page for a complete list.
+</Tip>
+
+### 2. Configure Reverse Proxy
+
+Use Nginx or Traefik as a reverse proxy:
+
+<CodeGroup>
+```nginx nginx.conf
+server {
+    listen 80;
+    server_name postiz.yourdomain.com;
+
+    location / {
+        proxy_pass http://localhost:4007;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+```yaml traefik-labels
+postiz:
+  labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.postiz.rule=Host(`postiz.yourdomain.com`)"
+    - "traefik.http.routers.postiz.entrypoints=websecure"
+    - "traefik.http.routers.postiz.tls.certresolver=letsencrypt"
+```
+</CodeGroup>
+
+### 3. Enable SSL/TLS
+
+Update URLs to use HTTPS:
+
+```yaml
+MAIN_URL: 'https://postiz.yourdomain.com'
+FRONTEND_URL: 'https://postiz.yourdomain.com'
+NEXT_PUBLIC_BACKEND_URL: 'https://postiz.yourdomain.com/api'
+```
+
+### 4. Set Resource Limits
+
+```yaml
+postiz:
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 4G
+      reservations:
+        cpus: '1'
+        memory: 2G
+```
+
+## Managing Services
+
+### Start Services
+
+```bash
+docker compose up -d
+```
+
+### Stop Services
+
+```bash
+docker compose down
+```
+
+### View Logs
+
+```bash
+# All services
+docker compose logs -f
+
+# Specific service
+docker compose logs -f postiz
+```
+
+### Restart Service
+
+```bash
+docker compose restart postiz
+```
+
+### Update to Latest Version
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+<Warning>
+Always backup your database before updating!
+</Warning>
+
+## Troubleshooting
+
+### Container Won't Start
+
+Check the logs:
+
+```bash
+docker compose logs postiz
+```
+
+### Database Connection Issues
+
+Verify PostgreSQL is healthy:
+
+```bash
+docker compose ps postiz-postgres
+docker compose exec postiz-postgres pg_isready -U postiz-user
+```
+
+### Port Already in Use
+
+Change the host port in `docker-compose.yaml`:
+
+```yaml
+ports:
+  - "8080:5000"  # Use 8080 instead of 4007
+```
+
+### Reset Everything
+
+<Warning>
+This will delete all data!
+</Warning>
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+## Monitoring
+
+### Health Checks
+
+Postiz includes health checks for critical services:
+
+```yaml
+postiz-postgres:
+  healthcheck:
+    test: pg_isready -U postiz-user -d postiz-db-local
+    interval: 10s
+    timeout: 3s
+    retries: 3
+
+postiz-redis:
+  healthcheck:
+    test: redis-cli ping
+    interval: 10s
+    timeout: 3s
+    retries: 3
+```
+
+### Temporal UI
+
+Access the Temporal UI to monitor workflows:
+
+```
+http://localhost:8080
+```
+
+### Sentry Integration (Optional)
+
+Enable Sentry for error tracking:
+
+```yaml
+NEXT_PUBLIC_SENTRY_DSN: 'http://spotlight:8969/stream'
+SENTRY_SPOTLIGHT: '1'
+```
+
+The Spotlight service will be available at `http://localhost:8969`.
+
+## Next Steps
+
+<Steps>
+  <Step title="Configure Storage">
+    Set up [storage configuration](/self-hosting/storage-configuration) for media uploads
+  </Step>
+  
+  <Step title="Add Social Media OAuth">
+    Configure [authentication](/self-hosting/authentication) for social media platforms
+  </Step>
+  
+  <Step title="Review All Variables">
+    Check the complete [environment variables reference](/self-hosting/environment-variables)
+  </Step>
+</Steps>

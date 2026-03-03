@@ -1,0 +1,624 @@
+---
+title: 'Stripe Billing Configuration'
+description: 'Configure Stripe for subscription billing and payment processing'
+---
+
+Postiz uses Stripe for subscription billing, payment processing, and revenue management. Configure Stripe to enable paid plans and billing features.
+
+## Features
+
+- Subscription management (Standard and Pro plans)
+- Monthly and yearly billing cycles
+- 7-day free trial support
+- Proration for plan changes
+- Promotion codes and coupons
+- Billing portal for customers
+- Webhook event processing
+- Refund management
+- Usage tracking and analytics
+
+## Environment Variables
+
+Add these variables to your `.env` file:
+
+```bash
+# Stripe Keys
+STRIPE_PUBLISHABLE_KEY="pk_live_xxxxxxxxxxxxxxxxxxxx"
+STRIPE_SECRET_KEY="sk_live_xxxxxxxxxxxxxxxxxxxx"
+
+# Webhook Signing Secrets
+STRIPE_SIGNING_KEY="whsec_xxxxxxxxxxxxxxxxxxxx"
+STRIPE_SIGNING_KEY_CONNECT="whsec_xxxxxxxxxxxxxxxxxxxx"
+
+# Fee Configuration
+FEE_AMOUNT=0.05  # 5% platform fee
+```
+
+<Info>
+  If Stripe keys are not configured, billing features will be disabled but Postiz will continue to function normally.
+</Info>
+
+## Setup Guide
+
+<Steps>
+
+<Step title="Create Stripe Account">
+  1. Visit [stripe.com](https://stripe.com) and create an account
+  2. Complete business verification
+  3. Navigate to the Dashboard
+</Step>
+
+<Step title="Get API Keys">
+  1. Go to Developers → API keys
+  2. Reveal and copy:
+     - **Publishable key** (starts with `pk_`)
+     - **Secret key** (starts with `sk_`)
+  
+  <Warning>
+    Use test keys (`pk_test_` and `sk_test_`) for development. Switch to live keys for production.
+  </Warning>
+</Step>
+
+<Step title="Create Products">
+  Create pricing products for your subscription plans:
+  
+  1. Go to Products → Add product
+  2. Create two products:
+     - **Standard** - Basic plan
+     - **Pro** - Professional plan
+  3. For each product, create two prices:
+     - Monthly recurring
+     - Yearly recurring
+</Step>
+
+<Step title="Configure Webhooks">
+  Set up webhook endpoints to receive Stripe events:
+  
+  1. Go to Developers → Webhooks
+  2. Click "Add endpoint"
+  3. Enter webhook URL:
+     ```
+     https://your-domain.com/api/billing/stripe/webhook
+     ```
+  4. Select events to listen for:
+     - `customer.subscription.created`
+     - `customer.subscription.updated`
+     - `customer.subscription.deleted`
+     - `invoice.payment_succeeded`
+  5. Copy the signing secret (starts with `whsec_`)
+</Step>
+
+<Step title="Configure Environment">
+  Add to your `.env` file:
+  
+  ```bash
+  STRIPE_PUBLISHABLE_KEY="pk_live_xxxxxxxxxxxxxxxxxxxx"
+  STRIPE_SECRET_KEY="sk_live_xxxxxxxxxxxxxxxxxxxx"
+  STRIPE_SIGNING_KEY="whsec_xxxxxxxxxxxxxxxxxxxx"
+  STRIPE_SIGNING_KEY_CONNECT="whsec_xxxxxxxxxxxxxxxxxxxx"
+  FEE_AMOUNT=0.05
+  ```
+</Step>
+
+<Step title="Restart Postiz">
+  Apply the configuration:
+  
+  ```bash
+  docker compose restart backend
+  ```
+</Step>
+
+</Steps>
+
+## Subscription Flow
+
+Postiz implements a complete subscription management system:
+
+### Creating Subscriptions
+
+From `stripe.service.ts:718-824`:
+
+```typescript
+async subscribe(
+  uniqueId: string,
+  organizationId: string,
+  userId: string,
+  body: BillingSubscribeDto,
+  allowTrial: boolean
+) {
+  const org = await this._organizationService.getOrgById(organizationId);
+  const customer = await this.createOrGetCustomer(org!);
+  
+  // Find or create Stripe product and price
+  const findProduct = await stripe.products.create({
+    active: true,
+    name: body.billing,
+  });
+  
+  const findPrice = await stripe.prices.create({
+    active: true,
+    product: findProduct.id,
+    currency: 'usd',
+    unit_amount: priceData.month_price * 100,
+    recurring: {
+      interval: body.period === 'MONTHLY' ? 'month' : 'year',
+    },
+  });
+  
+  // Create checkout session
+  return this.createCheckoutSession(
+    uniqueId,
+    id,
+    customer,
+    body,
+    findPrice.id,
+    userId,
+    allowTrial
+  );
+}
+```
+
+### Embedded Checkout
+
+Postiz supports Stripe's embedded checkout for seamless integration:
+
+```typescript
+// From stripe.service.ts:424-495
+const { client_secret } = await stripe.checkout.sessions.create({
+  ui_mode: 'custom',
+  customer,
+  return_url: process.env['FRONTEND_URL'] + `/launches?onboarding=true&check=${uniqueId}`,
+  mode: 'subscription',
+  subscription_data: {
+    ...(allowTrial ? { trial_period_days: 7 } : {}),
+    metadata: {
+      service: 'gitroom',
+      ...body,
+      userId,
+      uniqueId,
+    },
+  },
+  allow_promotion_codes: body.period === 'MONTHLY',
+  line_items: [{ price, quantity: 1 }],
+});
+
+return { client_secret, auto_apply_coupon };
+```
+
+## Webhook Event Handling
+
+### Subscription Created
+
+From `stripe.service.ts:102-131`:
+
+```typescript
+async createSubscription(event: Stripe.CustomerSubscriptionCreatedEvent) {
+  const { uniqueId, billing, period } = event.data.object.metadata;
+  
+  // Validate card for trial subscriptions
+  const check = await this.checkValidCard(event);
+  if (!check) {
+    return { ok: false };
+  }
+  
+  return this._subscriptionService.createOrUpdateSubscription(
+    event.data.object.status !== 'active',
+    uniqueId,
+    event.data.object.customer as string,
+    pricing[billing].channel!,
+    billing,
+    period,
+    event.data.object.cancel_at
+  );
+}
+```
+
+### Subscription Updated
+
+```typescript
+// From stripe.service.ts:132-157
+async updateSubscription(event: Stripe.CustomerSubscriptionUpdatedEvent) {
+  const { uniqueId, billing, period } = event.data.object.metadata;
+  
+  const check = await this.checkValidCard(event);
+  if (!check) {
+    return { ok: false };
+  }
+  
+  return this._subscriptionService.createOrUpdateSubscription(
+    event.data.object.status !== 'active',
+    uniqueId,
+    event.data.object.customer as string,
+    pricing[billing].channel!,
+    billing,
+    period,
+    event.data.object.cancel_at
+  );
+}
+```
+
+### Payment Succeeded
+
+```typescript
+// From stripe.service.ts:826-846
+async paymentSucceeded(event: Stripe.InvoicePaymentSucceededEvent) {
+  const subscriptionId = event.data.object.parent?.subscription_details?.subscription;
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  
+  const { userId, ud } = subscription.metadata;
+  const user = await this._userService.getUserById(userId);
+  
+  // Track purchase event for analytics
+  if (user && user.ip && user.agent) {
+    this._trackService.track(ud, user.ip, user.agent, TrackEnum.Purchase, {
+      value: event.data.object.amount_paid / 100,
+    });
+  }
+  
+  return { ok: true };
+}
+```
+
+## Free Trial Implementation
+
+### Card Validation for Trials
+
+From `stripe.service.ts:28-100`:
+
+```typescript
+async checkValidCard(event: Stripe.CustomerSubscriptionCreatedEvent) {
+  const org = await this._organizationService.getOrgByCustomerId(
+    event.data.object.customer as string
+  );
+  
+  if (!org?.allowTrial) {
+    return true;
+  }
+  
+  // Get latest payment method
+  const paymentMethods = await stripe.paymentMethods.list({
+    customer: event.data.object.customer as string,
+  });
+  
+  const latestMethod = paymentMethods.data.reduce((prev, current) => {
+    if (prev.created < current.created) {
+      return current;
+    }
+    return prev;
+  });
+  
+  // Verify card with $1 authorization (then cancel)
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: 100,
+    currency: 'usd',
+    payment_method: latestMethod.id,
+    customer: event.data.object.customer as string,
+    automatic_payment_methods: {
+      allow_redirects: 'never',
+      enabled: true,
+    },
+    capture_method: 'manual',
+    confirm: true,
+  });
+  
+  if (paymentIntent.status !== 'requires_capture') {
+    await stripe.subscriptions.cancel(event.data.object.id);
+    return false;
+  }
+  
+  await stripe.paymentIntents.cancel(paymentIntent.id);
+  return true;
+}
+```
+
+<Info>
+  Postiz validates trial subscriptions with a $1 authorization that is immediately cancelled to prevent abuse.
+</Info>
+
+## Proration
+
+Automatic proration when users change plans:
+
+```typescript
+// From stripe.service.ts:206-290
+async prorate(organizationId: string, body: BillingSubscribeDto) {
+  const org = await this._organizationService.getOrgById(organizationId);
+  const customer = await this.createOrGetCustomer(org!);
+  
+  const proration_date = Math.floor(Date.now() / 1000);
+  const currentSubscription = await stripe.subscriptions.list({ customer });
+  
+  const price = await stripe.invoices.createPreview({
+    customer,
+    subscription: currentSubscription.data[0]?.id,
+    subscription_details: {
+      proration_behavior: 'create_prorations',
+      billing_cycle_anchor: 'now',
+      items: [
+        {
+          id: currentSubscription.data[0]?.items?.data?.[0]?.id,
+          price: findPrice.id!,
+          quantity: 1,
+        },
+      ],
+      proration_date: proration_date,
+    },
+  });
+  
+  return {
+    price: price?.amount_remaining ? price.amount_remaining / 100 : 0,
+  };
+}
+```
+
+## Promotion Codes
+
+### Auto-Apply Promotion Codes
+
+From `stripe.service.ts:372-422`:
+
+```typescript
+private async findAutoApplyPromotionCode(): Promise<string | null> {
+  const promotionCodes = await stripe.promotionCodes.list({
+    active: true,
+    limit: 100,
+  });
+  
+  const now = Math.floor(Date.now() / 1000);
+  
+  for (const promoCode of promotionCodes.data) {
+    const coupon = promoCode.promotion.coupon;
+    
+    // Check if autoapply metadata is set
+    const autoApply = Object.assign(
+      {},
+      promoCode.metadata,
+      coupon?.metadata
+    )?.autoapply;
+    
+    if (autoApply !== 'true') continue;
+    
+    // Check expiration
+    if (promoCode.expires_at && promoCode.expires_at < now) continue;
+    if (coupon?.redeem_by && coupon.redeem_by < now) continue;
+    
+    // Check max redemptions
+    if (
+      promoCode.max_redemptions &&
+      promoCode.times_redeemed >= promoCode.max_redemptions
+    ) continue;
+    
+    return promoCode.code;
+  }
+  
+  return null;
+}
+```
+
+<Tip>
+  Set `autoapply: true` in promotion code metadata to automatically apply it to monthly subscriptions.
+</Tip>
+
+## Billing Portal
+
+Customers can manage their subscriptions through Stripe's billing portal:
+
+```typescript
+// From stripe.service.ts:365-370
+async createBillingPortalLink(customer: string) {
+  return stripe.billingPortal.sessions.create({
+    customer,
+    return_url: process.env['FRONTEND_URL'] + '/billing',
+  });
+}
+```
+
+Features:
+- Update payment method
+- View invoices
+- Download receipts
+- Cancel subscription
+
+## Subscription Cancellation
+
+### Cancel at Period End
+
+From `stripe.service.ts:301-358`:
+
+```typescript
+async setToCancel(organizationId: string) {
+  const org = await this._organizationService.getOrgById(organizationId);
+  const customer = await this.createOrGetCustomer(org!);
+  
+  const subscriptions = await stripe.subscriptions.list({
+    customer,
+    status: 'all',
+    expand: ['data.latest_invoice'],
+  });
+  
+  const sub = subscriptions.data.filter(f => f.status !== 'canceled')[0];
+  
+  // Toggle cancellation
+  if (sub.cancel_at_period_end) {
+    const { cancel_at } = await stripe.subscriptions.update(sub.id, {
+      cancel_at_period_end: false,
+    });
+    
+    return {
+      id: makeId(10),
+      cancel_at: cancel_at ? new Date(cancel_at * 1000) : undefined,
+    };
+  }
+  
+  // Check if payment failed
+  const latestInvoice = sub.latest_invoice as Stripe.Invoice | null;
+  const hasFailedPayment =
+    sub.status === 'past_due' ||
+    latestInvoice?.status === 'open' ||
+    latestInvoice?.status === 'uncollectible';
+  
+  if (hasFailedPayment) {
+    // Cancel immediately
+    await stripe.subscriptions.cancel(sub.id);
+    await this._subscriptionService.deleteSubscription(customer);
+    
+    return { id: makeId(10), cancel_at: new Date() };
+  }
+  
+  // Cancel at period end
+  const { cancel_at } = await stripe.subscriptions.update(sub.id, {
+    cancel_at_period_end: true,
+  });
+  
+  return {
+    id: makeId(10),
+    cancel_at: cancel_at ? new Date(cancel_at * 1000) : undefined,
+  };
+}
+```
+
+## Refunds
+
+Administrators can issue refunds:
+
+```typescript
+// From stripe.service.ts:873-892
+async refundCharges(organizationId: string, chargeIds: string[]) {
+  const org = await this._organizationService.getOrgById(organizationId);
+  
+  const refunded: string[] = [];
+  const failed: string[] = [];
+  
+  for (const chargeId of chargeIds) {
+    try {
+      await stripe.refunds.create({ charge: chargeId });
+      refunded.push(chargeId);
+    } catch (err) {
+      failed.push(chargeId);
+    }
+  }
+  
+  return { refunded, failed };
+}
+```
+
+## Testing
+
+### Test Mode
+
+Use Stripe test keys for development:
+
+```bash
+STRIPE_PUBLISHABLE_KEY="pk_test_xxxxxxxxxxxxxxxxxxxx"
+STRIPE_SECRET_KEY="sk_test_xxxxxxxxxxxxxxxxxxxx"
+```
+
+### Test Cards
+
+Stripe provides test card numbers:
+
+- **Success**: `4242 4242 4242 4242`
+- **Declined**: `4000 0000 0000 0002`
+- **Requires Authentication**: `4000 0027 6000 3184`
+
+### Testing Webhooks Locally
+
+Use Stripe CLI to forward webhook events:
+
+```bash
+stripe listen --forward-to localhost:3000/api/billing/stripe/webhook
+```
+
+This provides a test webhook signing secret to use in development.
+
+## Troubleshooting
+
+<Accordion title="Webhook signature verification failed">
+  If webhooks fail with signature errors:
+  
+  1. Verify `STRIPE_SIGNING_KEY` matches the webhook secret in Stripe dashboard
+  2. Ensure raw request body is used (not parsed JSON)
+  3. Check webhook endpoint is publicly accessible
+  4. Verify HTTPS is used in production
+  
+  Test webhook:
+  ```bash
+  stripe trigger customer.subscription.created
+  ```
+</Accordion>
+
+<Accordion title="Trial card validation failing">
+  If trial subscriptions are being cancelled:
+  
+  1. Verify payment method is valid
+  2. Check card has sufficient funds for $1 authorization
+  3. Ensure 3D Secure is handled for cards that require it
+  4. Review logs for specific error messages
+  
+  Disable card validation for testing:
+  ```typescript
+  allowTrial: false
+  ```
+</Accordion>
+
+<Accordion title="Proration calculations incorrect">
+  Ensure:
+  
+  1. Subscription metadata includes correct pricing tier
+  2. `proration_behavior` is set to `'create_prorations'`
+  3. Billing cycle anchor is configured correctly
+  4. Current subscription is active
+</Accordion>
+
+<Accordion title="Customer not found errors">
+  If you see "customer not found":
+  
+  1. Verify organization has `paymentId` set
+  2. Check customer exists in Stripe dashboard
+  3. Ensure using correct Stripe account (test vs live)
+  4. Re-create customer if needed
+</Accordion>
+
+<Accordion title="Promotion codes not applying">
+  For auto-apply promotion codes:
+  
+  1. Set metadata: `autoapply: "true"`
+  2. Ensure code is active and not expired
+  3. Check max redemptions not reached
+  4. Verify code is valid for the product
+  5. Only works for monthly subscriptions
+</Accordion>
+
+## Security Best Practices
+
+<Warning>
+  Never expose Stripe secret keys in client-side code or commit them to version control.
+</Warning>
+
+- Store all Stripe keys in environment variables
+- Use test keys for development, live keys only in production
+- Verify webhook signatures for all incoming events
+- Use HTTPS for all webhook endpoints
+- Implement proper access controls for billing operations
+- Regularly rotate API keys
+- Monitor Stripe dashboard for suspicious activity
+- Enable Stripe Radar for fraud detection
+
+## Platform Fee Configuration
+
+Postiz supports platform fees for marketplace scenarios:
+
+```bash
+FEE_AMOUNT=0.05  # 5% fee
+```
+
+This deducts a percentage from each payment for platform revenue.
+
+## Next Steps
+
+After configuring Stripe billing:
+
+- [OAuth Apps](/configuration/oauth-apps) - Set up social media integrations
+- [Email Setup](/configuration/email-setup) - Configure transactional emails
+- [AI Integration](/configuration/ai-integration) - Enable AI features
+- [Short Links](/configuration/short-links) - Configure URL shortening

@@ -1,0 +1,285 @@
+---
+title: 'Threads Integration'
+description: "Post text and media to Meta's Threads platform with analytics"
+---
+
+## Overview
+
+Postiz integrates with Meta's Threads platform to post text, images, videos, and carousels with comprehensive analytics tracking.
+
+## Authentication
+
+Threads uses Meta's OAuth 2.0 with long-lived tokens.
+
+<Steps>
+  <Step title="Connect Threads">
+    Click "Connect Threads" in Integrations
+  </Step>
+  
+  <Step title="Authorize">
+    Grant all requested Threads permissions
+  </Step>
+  
+  <Step title="Auto-Refresh">
+    Tokens auto-refresh every 58 days
+  </Step>
+</Steps>
+
+<Note>
+  For HTTP (non-HTTPS) setups, Postiz automatically redirects through `redirectmeto.com` for OAuth.
+</Note>
+
+### Required Permissions
+
+- `threads_basic` - Basic account access
+- `threads_content_publish` - Publish content
+- `threads_manage_replies` - Manage replies
+- `threads_manage_insights` - Access analytics
+
+## Supported Features
+
+### Content Types
+
+<Tabs>
+  <Tab title="Text Posts">
+    - **Maximum**: 500 characters
+    - Plain text
+    - URLs automatically linked
+  </Tab>
+  
+  <Tab title="Single Media">
+    - One image or one video
+    - Images: JPG, PNG
+    - Videos: MP4
+    - Pulled from URL
+  </Tab>
+  
+  <Tab title="Carousel Posts">
+    - Multiple images (2-10)
+    - All images in slideshow format
+    - Cannot mix images and videos
+    - Single caption for carousel
+  </Tab>
+</Tabs>
+
+## Publishing Process
+
+Threads uses a two-step publishing process:
+
+<Steps>
+  <Step title="Create Media Container">
+    Upload media and create container with metadata
+  </Step>
+  
+  <Step title="Wait for Processing">
+    Poll status until FINISHED (checks every 2.2 seconds)
+  </Step>
+  
+  <Step title="Publish Thread">
+    Publish the container to make it live
+  </Step>
+  
+  <Step title="Get Permalink">
+    Retrieve post URL
+  </Step>
+</Steps>
+
+<Info>
+  Processing time varies based on media size. Postiz automatically waits for completion.
+</Info>
+
+### Content Types
+
+<AccordionGroup>
+  <Accordion title="Text-Only Posts">
+    ```typescript
+    {
+      media_type: "TEXT",
+      text: "Your post content",
+      reply_to_id: "optional_parent_id"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Single Image/Video">
+    ```typescript
+    {
+      image_url: "https://example.com/image.jpg",
+      // OR
+      video_url: "https://example.com/video.mp4",
+      media_type: "IMAGE" | "VIDEO",
+      text: "Caption"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Carousel Posts">
+    ```typescript
+    // Step 1: Create items
+    items = [item1_id, item2_id, item3_id]
+    
+    // Step 2: Create carousel
+    {
+      media_type: "CAROUSEL",
+      children: items.join(','),
+      text: "Carousel caption"
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Replies & Threading
+
+Create threaded conversations:
+
+<Steps>
+  <Step title="Main Post">
+    Publish initial thread
+  </Step>
+  
+  <Step title="Reply">
+    Reference parent with `reply_to_id`
+  </Step>
+  
+  <Step title="Thread Continuation">
+    Continue referencing previous reply
+  </Step>
+</Steps>
+
+## Analytics
+
+### Account-Level Analytics
+
+Track overall performance:
+
+- **Views**: Total thread views
+- **Likes**: Total likes
+- **Replies**: Reply count
+- **Reposts**: Repost count
+- **Quotes**: Quote posts
+
+### Post-Level Analytics
+
+Detailed per-post metrics:
+
+- Views
+- Likes
+- Replies
+- Reposts
+- Quotes
+
+Analytics update in real-time.
+
+<CodeGroup>
+```typescript Analytics Example
+{
+  "label": "Views",
+  "percentageChange": 0,
+  "data": [
+    {
+      "total": "1523",
+      "date": "2024-03-15"
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Automation Features
+
+### Auto-Plug Posts
+
+Automatically reply to high-performing posts:
+
+<CodeGroup>
+```typescript Configuration
+{
+  identifier: 'threads-autoPlugPost',
+  settings: {
+    likesAmount: 100,
+    post: "Your promotional message"
+  },
+  runEveryMilliseconds: 21600000,  // 6 hours
+  totalRuns: 3
+}
+```
+</CodeGroup>
+
+When a post reaches the like threshold, automatically adds your promotional reply.
+
+## Rate Limits
+
+<Info>
+  **Threads Rate Limits:**
+  - 2 concurrent posting jobs
+  - Processing time adds delays
+  - Moderate API limits
+  - No strict daily limits
+</Info>
+
+## Error Handling
+
+Common Threads errors:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| Error validating access token | Token expired | Automatic refresh/reconnect |
+| Text must be at most 500 characters | Character limit | Shorten text to 500 chars |
+| Processing error | Media issue | Check media format and size |
+| Status: ERROR | Upload failed | Retry with different media |
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Character Limit">
+    Keep posts concise - 500 character maximum
+  </Card>
+  
+  <Card title="Carousel Strategy">
+    Use 3-5 images for optimal engagement
+  </Card>
+  
+  <Card title="Video Format">
+    Vertical 9:16 videos perform best
+  </Card>
+  
+  <Card title="Posting Time">
+    Best engagement: 12-3 PM and 6-9 PM
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Processing Timeout">
+    If media processing takes too long:
+    - Large files take longer to process
+    - Check media format is supported
+    - Try reducing file size
+    - Network issues may cause delays
+  </Accordion>
+  
+  <Accordion title="Carousel Creation Failed">
+    Carousel issues:
+    - All items must be images (no videos)
+    - Items must finish processing first
+    - Minimum 2 items required
+    - Check all item IDs are valid
+  </Accordion>
+  
+  <Accordion title="Token Refresh Issues">
+    Authentication problems:
+    - Tokens refresh automatically every 58 days
+    - If refresh fails, reconnect account
+    - Check Meta hasn't revoked access
+    - Verify all permissions granted
+  </Accordion>
+  
+  <Accordion title="Analytics Not Loading">
+    Analytics issues:
+    - Data may take time to populate
+    - Check insights permission granted
+    - Some metrics only for certain post types
+    - Try refreshing after a few hours
+  </Accordion>
+</AccordionGroup>

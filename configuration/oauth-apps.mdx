@@ -1,0 +1,353 @@
+---
+title: 'OAuth App Configuration'
+description: 'Configure OAuth applications for social media platform integrations'
+---
+
+Postiz integrates with 28+ social media platforms using OAuth authentication. Each platform requires you to create an OAuth app and configure API credentials.
+
+## Supported Platforms
+
+Postiz supports the following OAuth-based platforms:
+
+- **X (Twitter)** - Post tweets, threads, and retweets
+- **LinkedIn** - Personal profiles and company pages
+- **Facebook** - Facebook Pages posting
+- **Instagram** - Through Facebook Graph API
+- **YouTube** - Video uploads and community posts
+- **TikTok** - Video content posting
+- **Reddit** - Subreddit posting
+- **Pinterest** - Pin and board management
+- **Threads** - Meta's text-based platform
+- **GitHub** - Repository discussions
+- **Discord** - Channel messaging
+- **Slack** - Workspace messaging
+- **Dribbble** - Design portfolio posts
+- **Mastodon** - Federated social network
+
+## Environment Variables
+
+Add the following environment variables to your `.env` file for the platforms you want to enable:
+
+<CodeGroup>
+
+```bash Social Platforms
+# X (Twitter)
+X_API_KEY="your-x-api-key"
+X_API_SECRET="your-x-api-secret"
+
+# LinkedIn
+LINKEDIN_CLIENT_ID="your-linkedin-client-id"
+LINKEDIN_CLIENT_SECRET="your-linkedin-client-secret"
+
+# Facebook & Instagram
+FACEBOOK_APP_ID="your-facebook-app-id"
+FACEBOOK_APP_SECRET="your-facebook-app-secret"
+
+# YouTube
+YOUTUBE_CLIENT_ID="your-youtube-client-id"
+YOUTUBE_CLIENT_SECRET="your-youtube-client-secret"
+
+# TikTok
+TIKTOK_CLIENT_ID="your-tiktok-client-id"
+TIKTOK_CLIENT_SECRET="your-tiktok-client-secret"
+
+# Pinterest
+PINTEREST_CLIENT_ID="your-pinterest-client-id"
+PINTEREST_CLIENT_SECRET="your-pinterest-client-secret"
+```
+
+```bash Communication Platforms
+# Reddit
+REDDIT_CLIENT_ID="your-reddit-client-id"
+REDDIT_CLIENT_SECRET="your-reddit-client-secret"
+
+# GitHub
+GITHUB_CLIENT_ID="your-github-client-id"
+GITHUB_CLIENT_SECRET="your-github-client-secret"
+
+# Threads
+THREADS_APP_ID="your-threads-app-id"
+THREADS_APP_SECRET="your-threads-app-secret"
+
+# Discord
+DISCORD_CLIENT_ID="your-discord-client-id"
+DISCORD_CLIENT_SECRET="your-discord-client-secret"
+DISCORD_BOT_TOKEN_ID="your-discord-bot-token"
+
+# Slack
+SLACK_ID="your-slack-client-id"
+SLACK_SECRET="your-slack-client-secret"
+SLACK_SIGNING_SECRET="your-slack-signing-secret"
+
+# Dribbble
+DRIBBBLE_CLIENT_ID="your-dribbble-client-id"
+DRIBBBLE_CLIENT_SECRET="your-dribbble-client-secret"
+```
+
+```bash Mastodon
+# Mastodon (default instance)
+MASTODON_URL="https://mastodon.social"
+MASTODON_CLIENT_ID="your-mastodon-client-id"
+MASTODON_CLIENT_SECRET="your-mastodon-client-secret"
+```
+
+</CodeGroup>
+
+<Info>
+  You only need to configure the platforms you plan to use. Missing credentials will simply disable that platform in the UI.
+</Info>
+
+## Platform Setup Guides
+
+<Steps>
+
+<Step title="Create OAuth Application">
+  Visit the developer portal for each platform you want to integrate:
+  
+  - **X**: [developer.twitter.com/apps](https://developer.twitter.com/apps)
+  - **LinkedIn**: [linkedin.com/developers/apps](https://www.linkedin.com/developers/apps)
+  - **Facebook**: [developers.facebook.com/apps](https://developers.facebook.com/apps)
+  - **YouTube**: [console.cloud.google.com](https://console.cloud.google.com)
+  - **TikTok**: [developers.tiktok.com](https://developers.tiktok.com)
+  - **Reddit**: [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps)
+  - **GitHub**: [github.com/settings/developers](https://github.com/settings/developers)
+</Step>
+
+<Step title="Configure Redirect URLs">
+  Set the OAuth callback URL to:
+  
+  ```
+  https://your-domain.com/api/integration/social/{platform}/callback
+  ```
+  
+  Replace `{platform}` with the platform identifier:
+  - `x` for X (Twitter)
+  - `linkedin` for LinkedIn
+  - `facebook` for Facebook
+  - `youtube` for YouTube
+  - `tiktok` for TikTok
+  - `reddit` for Reddit
+  - `github` for GitHub
+  - etc.
+</Step>
+
+<Step title="Configure Scopes">
+  Each platform requires specific OAuth scopes. The application automatically requests the correct scopes:
+  
+  **LinkedIn Scopes** (from `linkedin.provider.ts:28-36`):
+  - `openid`
+  - `profile`
+  - `w_member_social`
+  - `r_basicprofile`
+  - `rw_organization_admin`
+  - `w_organization_social`
+  - `r_organization_social`
+  
+  **Facebook Scopes** (from `facebook.provider.ts:19-26`):
+  - `pages_show_list`
+  - `business_management`
+  - `pages_manage_posts`
+  - `pages_manage_engagement`
+  - `pages_read_engagement`
+  - `read_insights`
+</Step>
+
+<Step title="Add Credentials to Environment">
+  Copy the Client ID and Client Secret from your OAuth app and add them to your `.env` file.
+  
+  Restart your Postiz instance to apply the changes:
+  
+  ```bash
+  docker compose restart
+  ```
+</Step>
+
+</Steps>
+
+## OAuth Flow Implementation
+
+Postiz implements a standard OAuth 2.0 flow with refresh token support:
+
+### Token Refresh
+
+Most platforms support automatic token refresh. Example from `linkedin.provider.ts:66-84`:
+
+```typescript
+async refreshToken(refresh_token: string): Promise<AuthTokenDetails> {
+  const {
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_in,
+  } = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token,
+      client_id: process.env.LINKEDIN_CLIENT_ID!,
+      client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
+    }),
+  }).then(res => res.json());
+  
+  return { accessToken, refreshToken, expiresIn: expires_in };
+}
+```
+
+<Note>
+  Postiz automatically refreshes tokens when they expire, ensuring uninterrupted posting.
+</Note>
+
+## Platform-Specific Configuration
+
+### X (Twitter)
+
+<Warning>
+  X has strict rate limits: 300 posts per 3 hours. Postiz automatically queues posts to respect these limits.
+</Warning>
+
+X requires elevated API access for posting. Apply for elevated access at [developer.twitter.com](https://developer.twitter.com).
+
+### Facebook & Instagram
+
+Facebook uses a two-step OAuth flow (`isBetweenSteps = true`) where users first authenticate with Facebook, then select which Pages to manage.
+
+Instagram posting is handled through the Facebook Graph API using the same credentials.
+
+### Discord
+
+Discord requires both OAuth credentials and a bot token:
+
+```bash
+DISCORD_CLIENT_ID="your-client-id"
+DISCORD_CLIENT_SECRET="your-client-secret"
+DISCORD_BOT_TOKEN_ID="your-bot-token"
+```
+
+### Slack
+
+Slack requires an additional signing secret for webhook verification:
+
+```bash
+SLACK_ID="your-client-id"
+SLACK_SECRET="your-client-secret"
+SLACK_SIGNING_SECRET="your-signing-secret"
+```
+
+### Mastodon
+
+Mastodon is federated, so you can configure a custom instance URL:
+
+```bash
+MASTODON_URL="https://your-instance.social"
+```
+
+## Testing OAuth Integration
+
+<Steps>
+
+<Step title="Start Postiz">
+  Ensure your instance is running and accessible at your configured `FRONTEND_URL`.
+</Step>
+
+<Step title="Connect Account">
+  Navigate to Settings → Integrations and click "Connect" for your platform.
+</Step>
+
+<Step title="Authorize">
+  Complete the OAuth flow on the platform's authorization page.
+</Step>
+
+<Step title="Verify Connection">
+  You should see your connected account in the integrations list with profile information.
+</Step>
+
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="Redirect URI mismatch error">
+  Ensure your OAuth app's redirect URI exactly matches:
+  ```
+  {NEXT_PUBLIC_BACKEND_URL}/api/integration/social/{platform}/callback
+  ```
+  
+  Check that `NEXT_PUBLIC_BACKEND_URL` in your `.env` file is correct and accessible.
+</Accordion>
+
+<Accordion title="Access token expired errors">
+  Postiz automatically refreshes tokens for most platforms. If you see persistent token errors:
+  
+  1. Disconnect and reconnect the account
+  2. Verify your OAuth app has the `offline_access` scope (if applicable)
+  3. Check that your Client Secret is correct
+</Accordion>
+
+<Accordion title="Platform not appearing in UI">
+  If a platform doesn't appear in the integrations list:
+  
+  1. Verify the environment variables are set correctly
+  2. Restart the backend service: `docker compose restart backend`
+  3. Check backend logs for initialization errors
+</Accordion>
+
+<Accordion title="Rate limit errors">
+  Each platform has different rate limits. Postiz respects these through the `maxConcurrentJob` setting:
+  
+  - X: 1 concurrent job (strict limits)
+  - LinkedIn: 2 concurrent jobs
+  - Facebook: 100 concurrent jobs
+  
+  If you encounter rate limits, posts will be automatically queued and retried.
+</Accordion>
+
+## Newsletter Platforms
+
+Some platforms use API keys instead of OAuth:
+
+```bash
+# Beehiiv
+BEEHIIVE_API_KEY="your-beehiiv-api-key"
+BEEHIIVE_PUBLICATION_ID="your-publication-id"
+
+# Listmonk
+LISTMONK_DOMAIN="https://your-listmonk-domain.com"
+LISTMONK_USER="your-username"
+LISTMONK_API_KEY="your-api-key"
+LISTMONK_LIST_ID="your-list-id"
+```
+
+<Tip>
+  Newsletter integrations don't require OAuth - just add the API credentials to your `.env` file.
+</Tip>
+
+## Chrome Extension for Cookie-Based Platforms
+
+Some platforms (like Skool) require cookie-based authentication via the Chrome extension:
+
+```bash
+EXTENSION_ID="your-chrome-extension-id"
+```
+
+Install the Postiz Chrome extension and configure it to sync cookies with your instance.
+
+## Security Best Practices
+
+<Warning>
+  Never commit your `.env` file to version control. Use `.env.example` as a template.
+</Warning>
+
+- Store OAuth secrets in environment variables, never in code
+- Use HTTPS for production deployments
+- Regularly rotate OAuth client secrets
+- Monitor OAuth app permissions and revoke unused access
+- Implement proper access controls for your Postiz instance
+
+## Next Steps
+
+After configuring OAuth apps:
+
+- [Email Setup](/configuration/email-setup) - Configure transactional emails
+- [AI Integration](/configuration/ai-integration) - Enable AI-powered post generation
+- [Billing Configuration](/configuration/billing-stripe) - Set up Stripe for payments

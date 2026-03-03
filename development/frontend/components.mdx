@@ -1,0 +1,532 @@
+---
+title: Component Architecture
+description: Learn component patterns and structure in Postiz
+---
+
+## Overview
+
+Postiz emphasizes custom-built components over third-party libraries. All UI components are crafted specifically for the application, ensuring full control over design and behavior.
+
+<Warning>
+**Critical Rule**: Never install frontend components from npm. Focus on writing native, custom components.
+</Warning>
+
+## Component Organization
+
+```
+apps/frontend/src/components/
+├── ui/                      # Reusable UI primitives
+│   ├── check.icon.component.tsx
+│   ├── logo-text.component.tsx
+│   └── translated-label.tsx
+├── layout/                 # Layout components
+│   ├── layout.context.tsx
+│   ├── sentry.component.tsx
+│   └── html.component.tsx
+├── calendar/              # Calendar feature
+├── analytics/             # Analytics feature
+├── launches/              # Launches feature
+├── media/                 # Media library
+├── settings/              # Settings pages
+└── auth/                  # Authentication
+```
+
+<Info>
+Many UI components live in `/apps/frontend/src/components/ui`. Always check for existing components before creating new ones.
+</Info>
+
+## Component Patterns
+
+### Basic Component Structure
+
+```typescript Button.tsx
+'use client';
+
+import { ReactNode } from 'react';
+import clsx from 'clsx';
+
+interface ButtonProps {
+  children: ReactNode;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  loading?: boolean;
+  className?: string;
+}
+
+export function Button({
+  children,
+  onClick,
+  variant = 'primary',
+  size = 'md',
+  disabled,
+  loading,
+  className,
+}: ButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
+      className={clsx(
+        // Base styles
+        'inline-flex items-center justify-center',
+        'font-medium rounded-lg transition-all',
+        'focus:outline-none focus:ring-2 focus:ring-offset-2',
+        
+        // Size variants
+        {
+          'px-3 py-1.5 text-sm': size === 'sm',
+          'px-4 py-2 text-base': size === 'md',
+          'px-6 py-3 text-lg': size === 'lg',
+        },
+        
+        // Color variants
+        {
+          'bg-btnPrimary text-btnText hover:opacity-90': variant === 'primary',
+          'bg-btnSimple text-btnText hover:bg-boxHover': variant === 'secondary',
+          'bg-red-600 text-white hover:bg-red-700': variant === 'danger',
+        },
+        
+        // States
+        {
+          'opacity-50 cursor-not-allowed': disabled || loading,
+        },
+        
+        className
+      )}
+    >
+      {loading && (
+        <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+      )}
+      {children}
+    </button>
+  );
+}
+```
+
+### Form Input Component
+
+```typescript Input.tsx
+'use client';
+
+import { forwardRef } from 'react';
+import clsx from 'clsx';
+
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
+  error?: string;
+  helperText?: string;
+}
+
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ label, error, helperText, className, ...props }, ref) => {
+    return (
+      <div className="flex flex-col gap-1.5">
+        {label && (
+          <label className="text-sm font-medium text-newTextColor">
+            {label}
+          </label>
+        )}
+        <input
+          ref={ref}
+          className={clsx(
+            'px-4 py-2 rounded-lg',
+            'bg-input text-inputText',
+            'border border-newBorder',
+            'focus:outline-none focus:ring-2 focus:ring-btnPrimary',
+            'placeholder:text-textItemBlur',
+            'transition-all',
+            {
+              'border-red-500': error,
+            },
+            className
+          )}
+          {...props}
+        />
+        {error && <p className="text-sm text-red-500">{error}</p>}
+        {helperText && !error && (
+          <p className="text-sm text-textItemBlur">{helperText}</p>
+        )}
+      </div>
+    );
+  }
+);
+
+Input.displayName = 'Input';
+```
+
+### Modal Component
+
+```typescript Modal.tsx
+'use client';
+
+import { ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import clsx from 'clsx';
+
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  children: ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+}
+
+export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-newBackdrop backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* Modal */}
+      <div 
+        className={clsx(
+          'relative z-10',
+          'bg-newBgColorInner rounded-lg shadow-xl',
+          'border border-newBorder',
+          'max-h-[90vh] overflow-y-auto',
+          {
+            'w-full max-w-sm': size === 'sm',
+            'w-full max-w-md': size === 'md',
+            'w-full max-w-2xl': size === 'lg',
+            'w-full max-w-4xl': size === 'xl',
+          }
+        )}
+      >
+        {/* Header */}
+        {title && (
+          <div className="flex items-center justify-between p-6 border-b border-newBorder">
+            <h2 className="text-xl font-semibold text-newTextColor">{title}</h2>
+            <button
+              onClick={onClose}
+              className="text-textItemBlur hover:text-newTextColor transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+        
+        {/* Content */}
+        <div className="p-6">
+          {children}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+```
+
+### Card Component
+
+```typescript Card.tsx
+import { ReactNode } from 'react';
+import clsx from 'clsx';
+
+interface CardProps {
+  children: ReactNode;
+  className?: string;
+  padding?: boolean;
+  hover?: boolean;
+}
+
+export function Card({ children, className, padding = true, hover = false }: CardProps) {
+  return (
+    <div
+      className={clsx(
+        'bg-newBgColorInner rounded-lg border border-newBorder',
+        {
+          'p-6': padding,
+          'transition-all hover:border-textItemFocused hover:shadow-lg': hover,
+        },
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+```
+
+## Data Fetching in Components
+
+### Using SWR
+
+<Note>
+Each SWR hook must be in a separate function. Never return multiple hooks from one function.
+</Note>
+
+```typescript PostsList.tsx
+'use client';
+
+import useSWR from 'swr';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch.tsx';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+
+const usePosts = () => {
+  const fetch = useFetch();
+  return useSWR('posts', () => fetch('/api/posts'));
+};
+
+export function PostsList() {
+  const { data: posts, error, isLoading, mutate } = usePosts();
+  const fetch = useFetch();
+
+  const deletePost = async (postId: string) => {
+    await fetch(`/api/posts/${postId}`, { method: 'DELETE' });
+    mutate(); // Revalidate
+  };
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  if (error) {
+    return <ErrorMessage error={error} />;
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {posts?.map((post) => (
+        <Card key={post.id} hover>
+          <h3 className="text-lg font-semibold mb-2">{post.title}</h3>
+          <p className="text-textItemBlur mb-4">{post.content}</p>
+          <Button 
+            variant="danger" 
+            size="sm"
+            onClick={() => deletePost(post.id)}
+          >
+            Delete
+          </Button>
+        </Card>
+      ))}
+    </div>
+  );
+}
+```
+
+### Form Handling with React Hook Form
+
+```typescript CreatePostForm.tsx
+'use client';
+
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch.tsx';
+
+const schema = yup.object({
+  title: yup.string().required('Title is required'),
+  content: yup.string().required('Content is required'),
+  scheduledAt: yup.date().required('Schedule date is required'),
+}).required();
+
+type FormData = yup.InferType<typeof schema>;
+
+export function CreatePostForm({ onSuccess }: { onSuccess: () => void }) {
+  const fetch = useFetch();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
+    resolver: yupResolver(schema),
+  });
+
+  const onSubmit = async (data: FormData) => {
+    await fetch('/api/posts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    onSuccess();
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <Input
+        label="Title"
+        {...register('title')}
+        error={errors.title?.message}
+      />
+      
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium">Content</label>
+        <textarea
+          {...register('content')}
+          className="px-4 py-2 rounded-lg bg-input text-inputText border border-newBorder"
+          rows={4}
+        />
+        {errors.content && (
+          <p className="text-sm text-red-500">{errors.content.message}</p>
+        )}
+      </div>
+      
+      <Input
+        label="Schedule Date"
+        type="datetime-local"
+        {...register('scheduledAt')}
+        error={errors.scheduledAt?.message}
+      />
+      
+      <Button type="submit" loading={isSubmitting}>
+        Create Post
+      </Button>
+    </form>
+  );
+}
+```
+
+## Component Libraries Used
+
+### Mantine (Minimal Usage)
+
+While Postiz uses Mantine, it's used sparingly for specific components:
+
+```typescript
+import { Tooltip } from '@mantine/core';
+import { DatePicker } from '@mantine/dates';
+import { useModals } from '@mantine/modals';
+
+// Use for specific cases where custom implementation would be complex
+```
+
+### Tiptap (Rich Text Editor)
+
+```typescript Editor.tsx
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+
+export function Editor({ content, onChange }) {
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content,
+    onUpdate: ({ editor }) => {
+      onChange(editor.getHTML());
+    },
+  });
+
+  return <EditorContent editor={editor} />;
+}
+```
+
+### Uppy (File Uploads)
+
+```typescript FileUpload.tsx
+import { Dashboard } from '@uppy/react';
+import Uppy from '@uppy/core';
+import AwsS3 from '@uppy/aws-s3';
+
+const uppy = new Uppy()
+  .use(AwsS3, {
+    companionUrl: '/api/upload',
+  });
+
+export function FileUpload() {
+  return <Dashboard uppy={uppy} />;
+}
+```
+
+## Styling Best Practices
+
+### Use clsx for Conditional Classes
+
+```typescript
+import clsx from 'clsx';
+
+<div className={clsx(
+  'base-class',
+  {
+    'active-class': isActive,
+    'disabled-class': isDisabled,
+  },
+  customClassName
+)} />
+```
+
+### Responsive Design
+
+```typescript
+<div className="
+  flex flex-col
+  mobile:gap-2
+  tablet:gap-4 tablet:flex-row
+  lg:gap-6
+">
+  {/* Content */}
+</div>
+```
+
+### Dark Mode (Built-in)
+
+All components support dark mode by default using CSS custom properties:
+
+```typescript
+<div className="bg-newBgColor text-newTextColor">
+  {/* Automatically adjusts for dark mode */}
+</div>
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Build custom components">
+    Always create custom components instead of installing from npm.
+  </Step>
+  
+  <Step title="Use TypeScript">
+    All components should have proper TypeScript interfaces.
+  </Step>
+  
+  <Step title="Make components reusable">
+    Accept className prop and forward refs when appropriate.
+  </Step>
+  
+  <Step title="Follow naming conventions">
+    Use PascalCase for component files: `Button.tsx`, `Modal.tsx`
+  </Step>
+  
+  <Step title="Keep components focused">
+    Each component should have a single responsibility.
+  </Step>
+  
+  <Step title="Use color system">
+    Always use CSS custom properties from colors.scss.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Routing Structure" icon="route" href="/development/frontend/routing">
+    Learn Next.js App Router patterns
+  </Card>
+  <Card title="Styling Guide" icon="palette" href="/development/frontend/styling">
+    Master Tailwind CSS styling
+  </Card>
+</CardGroup>

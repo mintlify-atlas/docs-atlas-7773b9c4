@@ -1,0 +1,416 @@
+---
+title: 'Upload Media'
+description: 'Upload images, videos, and files for use in posts'
+api: 'POST /public/v1/upload'
+---
+
+## Overview
+
+Upload media files (images, videos, documents) to Postiz. Returns a media object with a `path` URL that can be used in post creation requests.
+
+Postiz provides two upload methods:
+1. **File Upload** - Upload files directly from your local system
+2. **URL Upload** - Upload files from a URL
+
+## File Upload
+
+Upload a file using multipart/form-data.
+
+### Request
+
+<ParamField body="file" type="file" required>
+  The file to upload. Supports:
+  - **Images**: PNG, JPG, JPEG, GIF, WEBP, SVG, BMP, ICO
+  - **Videos**: MP4, MOV, AVI, MKV, WEBM, FLV, WMV, M4V, MPEG, 3GP
+  - **Audio**: MP3, WAV, OGG, AAC, FLAC, M4A
+  - **Documents**: PDF, DOC, DOCX
+</ParamField>
+
+### Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the uploaded media
+</ResponseField>
+
+<ResponseField name="path" type="string">
+  Full URL to the uploaded media. Use this value in the `image` array when creating posts.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Original filename of the uploaded media
+</ResponseField>
+
+### Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.postiz.com/public/v1/upload \
+  -H "Authorization: YOUR_API_KEY" \
+  -F "file=@/path/to/image.jpg"
+```
+
+```javascript Node.js (node-fetch)
+import fetch, { FormData } from 'node-fetch';
+import { readFileSync } from 'fs';
+
+const formData = new FormData();
+const fileBuffer = readFileSync('/path/to/image.jpg');
+const blob = new Blob([fileBuffer], { type: 'image/jpeg' });
+
+formData.append('file', blob, 'image.jpg');
+
+const response = await fetch('https://api.postiz.com/public/v1/upload', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'YOUR_API_KEY'
+  },
+  body: formData
+});
+
+const media = await response.json();
+console.log('Uploaded:', media.path);
+```
+
+```javascript Node.js SDK
+import Postiz from '@postiz/node';
+import { readFileSync } from 'fs';
+
+const postiz = new Postiz('YOUR_API_KEY');
+
+// Upload a file
+const fileBuffer = readFileSync('/path/to/image.jpg');
+const media = await postiz.upload(fileBuffer, 'image.jpg');
+
+console.log('Uploaded:', media.path);
+
+// Use in a post
+await postiz.post({
+  type: 'schedule',
+  date: '2024-12-31T12:00:00Z',
+  shortLink: true,
+  tags: [],
+  posts: [{
+    integration: { id: 'integration-id' },
+    value: [{
+      content: 'Check out this image!',
+      image: [{
+        id: media.id,
+        path: media.path
+      }]
+    }]
+  }]
+});
+```
+
+```bash CLI
+postiz upload /path/to/image.jpg
+```
+
+```python Python
+import requests
+
+with open('/path/to/image.jpg', 'rb') as f:
+    files = {'file': f}
+    headers = {'Authorization': 'YOUR_API_KEY'}
+    
+    response = requests.post(
+        'https://api.postiz.com/public/v1/upload',
+        headers=headers,
+        files=files
+    )
+    
+    media = response.json()
+    print('Uploaded:', media['path'])
+```
+
+</CodeGroup>
+
+## URL Upload
+
+Upload a file from a URL without downloading it locally first.
+
+### Endpoint
+
+```
+POST /public/v1/upload-from-url
+```
+
+### Request
+
+<ParamField body="url" type="string" required>
+  URL of the file to upload. Must be a valid image, video, or document URL with appropriate file extension.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.postiz.com/public/v1/upload-from-url \
+  -H "Authorization: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/image.jpg"
+  }'
+```
+
+```javascript Node.js
+const response = await fetch(
+  'https://api.postiz.com/public/v1/upload-from-url',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': 'YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      url: 'https://example.com/image.jpg'
+    })
+  }
+);
+
+const media = await response.json();
+console.log('Uploaded:', media.path);
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    'https://api.postiz.com/public/v1/upload-from-url',
+    headers={
+        'Authorization': 'YOUR_API_KEY',
+        'Content-Type': 'application/json'
+    },
+    json={'url': 'https://example.com/image.jpg'}
+)
+
+media = response.json()
+print('Uploaded:', media['path'])
+```
+
+</CodeGroup>
+
+## Response Example
+
+```json
+{
+  "id": "media-abc123",
+  "path": "https://cdn.postiz.com/uploads/org-456/image-abc123.jpg",
+  "name": "image.jpg"
+}
+```
+
+## Using Uploaded Media in Posts
+
+After uploading, use the returned `path` in your post creation request:
+
+```javascript
+const postiz = new Postiz('YOUR_API_KEY');
+
+// 1. Upload media
+const fileBuffer = readFileSync('photo.jpg');
+const media = await postiz.upload(fileBuffer, 'photo.jpg');
+
+// 2. Create post with media
+await postiz.post({
+  type: 'schedule',
+  date: '2024-12-31T12:00:00Z',
+  shortLink: true,
+  tags: [],
+  posts: [{
+    integration: { id: 'twitter-id' },
+    value: [{
+      content: 'Beautiful sunset!',
+      image: [{
+        id: media.id,      // Use the ID from upload response
+        path: media.path   // Use the path from upload response
+      }]
+    }]
+  }]
+});
+```
+
+## Multiple Media Files
+
+Upload and attach multiple media files to a post:
+
+```javascript
+const postiz = new Postiz('YOUR_API_KEY');
+
+// Upload multiple files
+const media1 = await postiz.upload(
+  readFileSync('photo1.jpg'),
+  'photo1.jpg'
+);
+const media2 = await postiz.upload(
+  readFileSync('photo2.jpg'),
+  'photo2.jpg'
+);
+const media3 = await postiz.upload(
+  readFileSync('video.mp4'),
+  'video.mp4'
+);
+
+// Create post with multiple media
+await postiz.post({
+  type: 'schedule',
+  date: '2024-12-31T12:00:00Z',
+  shortLink: true,
+  tags: [],
+  posts: [{
+    integration: { id: 'twitter-id' },
+    value: [{
+      content: 'Check out these photos and video!',
+      image: [
+        { id: media1.id, path: media1.path },
+        { id: media2.id, path: media2.path },
+        { id: media3.id, path: media3.path }
+      ]
+    }]
+  }]
+});
+```
+
+## Supported File Types
+
+### Images
+
+| Extension | MIME Type | Notes |
+|-----------|-----------|-------|
+| .png | image/png | Recommended for graphics |
+| .jpg, .jpeg | image/jpeg | Recommended for photos |
+| .gif | image/gif | Supports animation |
+| .webp | image/webp | Modern format |
+| .svg | image/svg+xml | Vector graphics |
+| .bmp | image/bmp | Bitmap |
+| .ico | image/x-icon | Icons |
+
+### Videos
+
+| Extension | MIME Type | Notes |
+|-----------|-----------|-------|
+| .mp4 | video/mp4 | Most compatible |
+| .mov | video/quicktime | Apple format |
+| .avi | video/x-msvideo | Windows format |
+| .mkv | video/x-matroska | High quality |
+| .webm | video/webm | Web optimized |
+| .flv | video/x-flv | Flash video |
+| .wmv | video/x-ms-wmv | Windows Media |
+| .m4v | video/x-m4v | Apple format |
+| .mpeg, .mpg | video/mpeg | MPEG format |
+| .3gp | video/3gpp | Mobile format |
+
+### Audio
+
+| Extension | MIME Type |
+|-----------|----------|
+| .mp3 | audio/mpeg |
+| .wav | audio/wav |
+| .ogg | audio/ogg |
+| .aac | audio/aac |
+| .flac | audio/flac |
+| .m4a | audio/mp4 |
+
+### Documents
+
+| Extension | MIME Type |
+|-----------|----------|
+| .pdf | application/pdf |
+| .doc | application/msword |
+| .docx | application/vnd.openxmlformats-officedocument.wordprocessingml.document |
+
+## File Size Limits
+
+File size limits depend on your platform and plan:
+
+- **Images**: Typically up to 10MB
+- **Videos**: Varies by platform (e.g., Twitter: 512MB, LinkedIn: 200MB)
+- **Documents**: Up to 10MB
+
+Check platform-specific limits before uploading.
+
+## Error Responses
+
+<ResponseField name="400" type="Bad Request">
+  Missing file or invalid URL
+  
+  ```json
+  {
+    "msg": "No file provided"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+  Invalid or missing API key
+  
+  ```json
+  {
+    "msg": "Invalid API key"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="413" type="Payload Too Large">
+  File size exceeds limits
+  
+  ```json
+  {
+    "statusCode": 413,
+    "message": "File too large"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="415" type="Unsupported Media Type">
+  File type not supported
+  
+  ```json
+  {
+    "statusCode": 415,
+    "message": "Unsupported file type"
+  }
+  ```
+</ResponseField>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Optimize File Sizes">
+    Compress images and videos before uploading to reduce storage costs and improve post performance.
+  </Accordion>
+  
+  <Accordion title="Use Appropriate Formats">
+    - Use JPEG for photos
+    - Use PNG for graphics with transparency
+    - Use MP4 for videos (best compatibility)
+  </Accordion>
+  
+  <Accordion title="Add Alt Text">
+    Include alt text in the media object for accessibility:
+    ```javascript
+    {
+      id: media.id,
+      path: media.path,
+      alt: "Description of the image for screen readers"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Validate Before Upload">
+    Check file types and sizes client-side before uploading to avoid API errors.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Create Post" icon="paper-plane" href="/api/posts/create-post">
+    Use uploaded media in posts
+  </Card>
+  <Card title="Media Library" icon="images" href="/features/media-library">
+    Learn about media management
+  </Card>
+</CardGroup>

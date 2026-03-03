@@ -1,0 +1,431 @@
+---
+title: Contributing Guidelines
+description: How to contribute to Postiz
+---
+
+## Welcome Contributors
+
+Contributions are welcome - code, docs, whatever it might be! If this is your first contribution to an Open Source project or you're a core maintainer of multiple projects, your time and interest in contributing to this project is most welcome.
+
+<Info>
+Before starting, please read the [developer guide](/development/architecture) to understand the project structure and setup your development environment.
+</Info>
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js**: `>=22.12.0 <23.0.0`
+- **pnpm**: `10.6.1`
+- **PostgreSQL**: Latest version
+- **Redis**: Latest version
+- **Git**: Latest version
+
+### Setup Development Environment
+
+<Steps>
+  <Step title="Fork the repository">
+    Create a personal copy of the repository on your GitHub account.
+    
+    ```bash
+    # Visit https://github.com/gitroomhq/postiz-app and click "Fork"
+    ```
+  </Step>
+  
+  <Step title="Clone your fork">
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/postiz-app.git
+    cd postiz-app
+    ```
+  </Step>
+  
+  <Step title="Install dependencies">
+    ```bash
+    pnpm install
+    ```
+  </Step>
+  
+  <Step title="Setup environment">
+    ```bash
+    cp .env.example .env
+    # Edit .env with your configuration
+    ```
+  </Step>
+  
+  <Step title="Start development services">
+    ```bash
+    # Start PostgreSQL and Redis
+    pnpm dev:docker
+    
+    # Run database migrations
+    pnpm prisma-db-push
+    
+    # Start development servers
+    pnpm dev
+    ```
+  </Step>
+</Steps>
+
+## Contribution Workflow
+
+### 1. Pick an Issue
+
+Browse [GitHub issues](https://github.com/gitroomhq/postiz-app/issues) and pick one that interests you, or create a new issue if you have an idea.
+
+**Good first issues** are labeled with `good first issue`.
+
+### 2. Discuss Before Coding
+
+<Warning>
+**General Rule**:
+- **If a change is less than 3 lines**: You're probably safe to submit without discussion
+- **If a change is more than 3 lines**: Discuss in an issue or Discord first
+
+This saves you time and avoids disappointment if your change can't be accepted.
+</Warning>
+
+**Best ways to interact with the community:**
+- **GitHub issues**: For detailed, longer-written discussions
+- **[Discord chat](https://discord.postiz.com)**: For quick questions and feedback
+
+### 3. Create a Branch
+
+Create a new branch for your changes:
+
+```bash
+git checkout -b feature/your-feature-name
+```
+
+**Branch naming conventions:**
+- `feature/add-mastodon-provider` - New features
+- `fix/calendar-rendering-bug` - Bug fixes
+- `docs/update-api-guide` - Documentation
+- `refactor/improve-auth-flow` - Refactoring
+
+### 4. Make Your Changes
+
+Follow the [code standards](/development/code-standards) and [testing strategy](/development/testing) while implementing your changes.
+
+### 5. Test Your Changes
+
+```bash
+# Run linting
+pnpm lint
+
+# Run tests
+pnpm test
+
+# Test locally
+pnpm dev
+```
+
+### 6. Commit Your Changes
+
+Write clear, descriptive commit messages:
+
+```bash
+# Good commit messages
+git commit -m "feat: add Mastodon integration provider"
+git commit -m "fix: resolve calendar date rendering issue"
+git commit -m "docs: update OAuth flow documentation"
+
+# Bad commit messages
+git commit -m "updates"  # Too vague
+git commit -m "fixed stuff"  # Not descriptive
+```
+
+**Commit message format:**
+```
+<type>: <description>
+
+[optional body]
+
+[optional footer]
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `refactor`: Code refactoring
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks
+
+### 7. Push Your Changes
+
+```bash
+git push -u origin feature/your-feature-name
+```
+
+### 8. Create a Pull Request
+
+Go to GitHub and create a pull request **to the main branch**.
+
+**Pull Request Template:**
+```markdown
+## Description
+Brief description of what this PR does
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+
+## Testing
+How has this been tested?
+
+## Screenshots (if applicable)
+Add screenshots for UI changes
+
+## Checklist
+- [ ] My code follows the project's code standards
+- [ ] I have performed a self-review
+- [ ] I have commented my code where necessary
+- [ ] I have updated the documentation
+- [ ] My changes generate no new warnings
+- [ ] I have added tests
+- [ ] All tests pass locally
+```
+
+## Types of Contributions
+
+### Code Improvements
+
+**Bug Fixes:**
+- Search for bugs in [GitHub issues](https://github.com/gitroomhq/postiz-app/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
+- Reproduce the bug locally
+- Fix and add regression tests
+- Submit PR with clear description
+
+**New Features:**
+- Discuss feature in issue first
+- Break into smaller PRs if possible
+- Include tests and documentation
+- Update relevant docs
+
+**New Integrations:**
+- See [Creating a Provider](/development/integrations/creating-provider)
+- Test OAuth flow thoroughly
+- Include platform-specific documentation
+- Add platform logo and branding
+
+### Documentation Updates
+
+**Documentation improvements:**
+- Fix typos and grammar
+- Add missing information
+- Improve clarity and examples
+- Update outdated content
+
+**Where to contribute docs:**
+- `/docs` - Main documentation (this site)
+- `README.md` - Project README
+- Code comments - JSDoc/TSDoc comments
+- `/CONTRIBUTING.md` - This file
+
+### Feature Requests
+
+Submit feature requests as GitHub issues:
+
+1. Search existing issues first
+2. Describe the feature clearly
+3. Explain the use case
+4. Provide examples if possible
+
+### Bug Reports
+
+Report bugs with detailed information:
+
+**Bug Report Template:**
+```markdown
+## Bug Description
+Clear description of the bug
+
+## Steps to Reproduce
+1. Go to '...'
+2. Click on '...'
+3. See error
+
+## Expected Behavior
+What should happen
+
+## Actual Behavior
+What actually happens
+
+## Environment
+- OS: [e.g., macOS 14.0]
+- Browser: [e.g., Chrome 120]
+- Node.js: [e.g., 22.12.0]
+- Version: [e.g., 1.0.0]
+
+## Screenshots
+If applicable
+
+## Additional Context
+Any other information
+```
+
+## Code Review Process
+
+### What Happens After Submitting PR
+
+<Steps>
+  <Step title="Automated Checks">
+    CI/CD runs automated tests, linting, and builds.
+  </Step>
+  
+  <Step title="Code Review">
+    Maintainers review your code and provide feedback.
+  </Step>
+  
+  <Step title="Revisions">
+    Make requested changes and push updates.
+  </Step>
+  
+  <Step title="Approval">
+    Once approved, PR is merged to main branch.
+  </Step>
+</Steps>
+
+### Review Criteria
+
+Your PR will be evaluated on:
+
+- **Code quality**: Follows standards, clean and readable
+- **Tests**: Adequate test coverage
+- **Documentation**: Updated relevant docs
+- **Functionality**: Works as intended
+- **Performance**: No significant performance regression
+- **Security**: No security vulnerabilities
+
+## Development Guidelines
+
+### Backend Development
+
+<Note>
+**Critical Rules**:
+1. Always follow Controller → Service → Repository pattern
+2. Most logic goes in `libraries/nestjs-libraries/src/services`
+3. Never skip layers in the architecture
+4. Use dependency injection
+</Note>
+
+See [Backend Development](/development/backend/overview) for details.
+
+### Frontend Development
+
+<Warning>
+**Critical Rules**:
+1. Never install UI components from npm - build custom components
+2. Each SWR hook must be in a separate function
+3. Always use `useFetch` hook for API calls
+4. Check existing components before creating new ones
+5. Use new color variables, not deprecated `--color-custom*`
+</Warning>
+
+See [Frontend Development](/development/frontend/overview) for details.
+
+### Integration Development
+
+When adding a new social media integration:
+
+1. Extend `SocialAbstract` class
+2. Implement `SocialProvider` interface
+3. Add OAuth flow
+4. Implement post publishing
+5. Add error handling
+6. Include tests
+7. Update documentation
+
+See [Creating a Provider](/development/integrations/creating-provider) for details.
+
+## Style Guidelines
+
+### Code Formatting
+
+- **Linting**: Run from root: `pnpm lint`
+- **Auto-format**: Prettier is configured
+- **TypeScript**: Required for all code
+- **No `any`**: Avoid `any` type, use proper types
+
+### Naming Conventions
+
+**Files:**
+```
+PascalCase for components: Button.tsx, UserProfile.tsx
+kebab-case for utilities: auth.service.ts, user.repository.ts
+```
+
+**Variables:**
+```typescript
+const userName = 'John';      // camelCase
+const MAX_RETRIES = 3;        // UPPER_SNAKE_CASE for constants
+interface UserData {}         // PascalCase for types/interfaces
+```
+
+**Functions:**
+```typescript
+function getUserById() {}     // camelCase
+async function fetchPosts() {} // async prefix clear from usage
+```
+
+## Communication
+
+### Discord Community
+
+Join our [Discord server](https://discord.postiz.com) for:
+- Quick questions
+- Feature discussions
+- Help with contributions
+- Community chat
+
+### GitHub Issues
+
+Use GitHub issues for:
+- Bug reports
+- Feature requests
+- Detailed technical discussions
+- Long-form proposals
+
+## Code of Conduct
+
+This project follows the [Contributor Covenant Code of Conduct](https://github.com/gitroomhq/postiz-app/blob/main/CODE_OF_CONDUCT.md).
+
+**Key points:**
+- Be respectful and inclusive
+- Welcome newcomers
+- Accept constructive feedback
+- Focus on what's best for the community
+
+**Report issues** to: nevo@gitroom.com
+
+## Recognition
+
+Contributors are recognized in:
+- GitHub contributors list
+- Release notes
+- Community shout-outs
+
+Thank you for contributing to Postiz!
+
+## Need Help?
+
+Check these resources:
+- [Developer Guide](/development/architecture)
+- [Support Page](https://docs.postiz.com/support)
+- [Discord Community](https://discord.postiz.com)
+- [GitHub Discussions](https://github.com/gitroomhq/postiz-app/discussions)
+
+Your contributions help make Postiz better!
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Code Standards" icon="book" href="/development/code-standards">
+    Follow code standards and conventions
+  </Card>
+  <Card title="Testing Strategy" icon="flask" href="/development/testing">
+    Learn testing best practices
+  </Card>
+</CardGroup>

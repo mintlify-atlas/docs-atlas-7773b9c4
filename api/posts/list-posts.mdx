@@ -1,0 +1,306 @@
+---
+title: 'List Posts'
+description: 'Retrieve scheduled and published posts'
+api: 'GET /public/v1/posts'
+---
+
+## Overview
+
+Retrieve a list of posts within a specified date range. Returns scheduled, published, and draft posts with their content, media, and status.
+
+## Request
+
+### Query Parameters
+
+<ParamField query="startDate" type="string" required>
+  ISO 8601 date string for the start of the date range.
+  
+  Example: `2024-01-01T00:00:00Z`
+</ParamField>
+
+<ParamField query="endDate" type="string" required>
+  ISO 8601 date string for the end of the date range.
+  
+  Example: `2024-12-31T23:59:59Z`
+</ParamField>
+
+<ParamField query="customer" type="string">
+  Optional customer ID to filter posts for a specific customer (multi-tenant scenarios).
+</ParamField>
+
+## Response
+
+<ResponseField name="posts" type="array">
+  Array of post objects
+  
+  <Expandable title="Post object properties">
+    <ResponseField name="id" type="string">
+      Unique post identifier
+    </ResponseField>
+    
+    <ResponseField name="group" type="string">
+      Group identifier linking related posts across platforms
+    </ResponseField>
+    
+    <ResponseField name="publishDate" type="string">
+      ISO 8601 timestamp when the post will be/was published
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Post status:
+      - `scheduled` - Waiting to be published
+      - `published` - Successfully published
+      - `draft` - Saved as draft
+      - `failed` - Publication failed
+      - `error` - Error occurred
+    </ResponseField>
+    
+    <ResponseField name="content" type="string">
+      Post text content
+    </ResponseField>
+    
+    <ResponseField name="integration" type="object">
+      Integration details
+      - `id` (string) - Integration ID
+      - `name` (string) - Platform name
+      - `identifier` (string) - Platform identifier (e.g., "twitter", "linkedin")
+      - `picture` (string) - Profile picture URL
+    </ResponseField>
+    
+    <ResponseField name="media" type="array">
+      Array of attached media files
+      - `id` (string) - Media identifier
+      - `url` (string) - Media file URL
+      - `type` (string) - Media type (image, video, etc.)
+    </ResponseField>
+    
+    <ResponseField name="settings" type="object">
+      Platform-specific settings used for the post
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET "https://api.postiz.com/public/v1/posts?startDate=2024-01-01T00:00:00Z&endDate=2024-12-31T23:59:59Z" \
+  -H "Authorization: YOUR_API_KEY" \
+  -H "Content-Type: application/json"
+```
+
+```bash cURL - With Customer Filter
+curl -X GET "https://api.postiz.com/public/v1/posts?startDate=2024-01-01T00:00:00Z&endDate=2024-12-31T23:59:59Z&customer=customer-123" \
+  -H "Authorization: YOUR_API_KEY" \
+  -H "Content-Type: application/json"
+```
+
+```javascript Node.js (fetch)
+const params = new URLSearchParams({
+  startDate: '2024-01-01T00:00:00Z',
+  endDate: '2024-12-31T23:59:59Z'
+});
+
+const response = await fetch(
+  `https://api.postiz.com/public/v1/posts?${params}`,
+  {
+    method: 'GET',
+    headers: {
+      'Authorization': 'YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    }
+  }
+);
+
+const data = await response.json();
+console.log('Posts:', data.posts);
+```
+
+```javascript Node.js SDK
+import Postiz from '@postiz/node';
+
+const postiz = new Postiz('YOUR_API_KEY');
+
+const result = await postiz.postList({
+  startDate: '2024-01-01T00:00:00Z',
+  endDate: '2024-12-31T23:59:59Z'
+});
+
+console.log('Posts:', result.posts);
+```
+
+```bash CLI
+# List all posts (defaults to last 30 days to next 30 days)
+postiz posts:list
+
+# List posts for specific date range
+postiz posts:list \
+  --startDate "2024-01-01T00:00:00Z" \
+  --endDate "2024-12-31T23:59:59Z"
+
+# List posts for specific customer
+postiz posts:list --customer "customer-123"
+```
+
+```python Python
+import requests
+from urllib.parse import urlencode
+
+params = {
+    'startDate': '2024-01-01T00:00:00Z',
+    'endDate': '2024-12-31T23:59:59Z'
+}
+
+url = f'https://api.postiz.com/public/v1/posts?{urlencode(params)}'
+
+response = requests.get(
+    url,
+    headers={
+        'Authorization': 'YOUR_API_KEY',
+        'Content-Type': 'application/json'
+    }
+)
+
+data = response.json()
+print('Posts:', data['posts'])
+```
+
+</CodeGroup>
+
+## Response Example
+
+```json
+{
+  "posts": [
+    {
+      "id": "post-123",
+      "group": "group-abc",
+      "publishDate": "2024-12-31T12:00:00Z",
+      "status": "scheduled",
+      "content": "Hello from Postiz!",
+      "integration": {
+        "id": "integration-456",
+        "name": "Twitter (@myaccount)",
+        "identifier": "twitter",
+        "picture": "https://pbs.twimg.com/profile.jpg"
+      },
+      "media": [
+        {
+          "id": "media-789",
+          "url": "https://cdn.postiz.com/image.jpg",
+          "type": "image"
+        }
+      ],
+      "settings": {
+        "who_can_reply_post": "everyone"
+      }
+    },
+    {
+      "id": "post-124",
+      "group": "group-abc",
+      "publishDate": "2024-12-31T12:00:00Z",
+      "status": "scheduled",
+      "content": "Hello from Postiz!",
+      "integration": {
+        "id": "integration-457",
+        "name": "LinkedIn (John Doe)",
+        "identifier": "linkedin",
+        "picture": "https://media.licdn.com/profile.jpg"
+      },
+      "media": [],
+      "settings": {
+        "visibility": "public"
+      }
+    }
+  ]
+}
+```
+
+## Filtering by Status
+
+While the API doesn't provide a status query parameter, you can filter posts client-side:
+
+```javascript
+const result = await postiz.postList({
+  startDate: '2024-01-01T00:00:00Z',
+  endDate: '2024-12-31T23:59:59Z'
+});
+
+// Filter scheduled posts only
+const scheduledPosts = result.posts.filter(post => 
+  post.status === 'scheduled'
+);
+
+// Filter failed posts
+const failedPosts = result.posts.filter(post => 
+  post.status === 'failed'
+);
+
+// Filter by platform
+const twitterPosts = result.posts.filter(post => 
+  post.integration.identifier === 'twitter'
+);
+```
+
+## Default Date Range
+
+The CLI uses default date ranges if not specified:
+
+- **Start Date**: 30 days ago from today
+- **End Date**: 30 days from today
+
+This covers both recent posts and upcoming scheduled posts.
+
+## Pagination
+
+The current API returns all posts within the date range. For large datasets, consider:
+
+1. Using smaller date ranges
+2. Filtering by customer for multi-tenant applications
+3. Implementing client-side pagination
+
+## Error Responses
+
+<ResponseField name="400" type="Bad Request">
+  Invalid date format or missing required parameters
+  
+  ```json
+  {
+    "statusCode": 400,
+    "message": ["startDate must be a valid ISO 8601 date string"],
+    "error": "Bad Request"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+  Invalid or missing API key
+  
+  ```json
+  {
+    "msg": "Invalid API key"
+  }
+  ```
+</ResponseField>
+
+## Notes
+
+<Note>
+  Posts are grouped by the `group` identifier. Multiple posts with the same group ID represent a multi-platform post created in a single request.
+</Note>
+
+<Tip>
+  Use reasonable date ranges to avoid large responses. A 3-6 month range is typically optimal for most use cases.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Create Post" icon="paper-plane" href="/api/posts/create-post">
+    Schedule a new post
+  </Card>
+  <Card title="Delete Post" icon="trash" href="/api/posts/delete-post">
+    Delete a scheduled post
+  </Card>
+</CardGroup>

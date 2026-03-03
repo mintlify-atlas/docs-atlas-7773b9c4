@@ -1,0 +1,332 @@
+---
+title: Monorepo Structure
+description: Understanding Postiz's monorepo organization and workspace structure
+---
+
+## Overview
+
+Postiz is organized as a monorepo using **pnpm workspaces**. This structure allows for code sharing across applications while maintaining clear separation between different parts of the system.
+
+<Warning>
+Only use **pnpm** as the package manager. Do not use npm or yarn. The project requires `pnpm@10.6.1` and Node.js `>=22.12.0 <23.0.0`.
+</Warning>
+
+## Root Structure
+
+```
+postiz-app/
+├── apps/                    # Application packages
+│   ├── backend/            # NestJS API server
+│   ├── frontend/           # React frontend (Vite)
+│   ├── orchestrator/       # Temporal workflow engine
+│   ├── extension/          # Browser extension
+│   ├── cli/                # Command-line interface
+│   ├── sdk/                # SDK for developers
+│   └── commands/           # CLI commands
+├── libraries/              # Shared libraries
+│   ├── nestjs-libraries/  # Backend shared code
+│   ├── react-shared-libraries/ # Frontend shared code
+│   └── helpers/           # Cross-platform utilities
+├── var/                    # Docker and deployment scripts
+├── package.json           # Root package.json (all dependencies)
+├── pnpm-workspace.yaml    # PNPM workspace configuration
+├── docker-compose.dev.yaml # Development docker setup
+└── .env                   # Environment configuration
+```
+
+<Info>
+All dependencies are managed in the **root `package.json`** file. Individual apps do not have their own dependencies.
+</Info>
+
+## Application Packages
+
+### Backend (`apps/backend`)
+
+The main REST API server built with NestJS.
+
+```
+apps/backend/
+├── src/
+│   ├── api/
+│   │   ├── routes/              # Route controllers
+│   │   │   ├── auth.controller.ts
+│   │   │   ├── posts.controller.ts
+│   │   │   └── ...
+│   │   └── api.module.ts
+│   ├── services/                # Application services
+│   │   └── auth/
+│   ├── public-api/             # Public API routes
+│   ├── app.module.ts           # Main app module
+│   └── main.ts                 # Entry point
+├── dist/                       # Build output
+└── tsconfig.json
+```
+
+<Tip>
+Most business logic lives in `libraries/nestjs-libraries/src/services`. The backend app primarily contains controllers that import and use these services.
+</Tip>
+
+### Frontend (`apps/frontend`)
+
+React application built with Vite and Next.js App Router.
+
+```
+apps/frontend/
+├── src/
+│   ├── app/
+│   │   ├── (app)/              # App routes (protected)
+│   │   │   ├── (site)/         # Main site routes
+│   │   │   │   ├── dashboard/
+│   │   │   │   ├── calendar/
+│   │   │   │   ├── analytics/
+│   │   │   │   └── ...
+│   │   │   └── layout.tsx
+│   │   ├── auth/               # Authentication routes
+│   │   ├── api/                # API routes
+│   │   ├── colors.scss         # Color variables
+│   │   └── global.scss         # Global styles
+│   └── components/
+│       ├── ui/                 # UI components
+│       ├── calendar/
+│       ├── analytics/
+│       └── ...
+├── public/                     # Static assets
+├── dist/                       # Build output
+├── tailwind.config.js
+└── vite.config.ts
+```
+
+### Orchestrator (`apps/orchestrator`)
+
+Temporal-based background job processor.
+
+```
+apps/orchestrator/
+├── src/
+│   ├── workflows/              # Temporal workflows
+│   │   ├── post-workflows/
+│   │   ├── autopost.workflow.ts
+│   │   ├── refresh.token.workflow.ts
+│   │   └── ...
+│   ├── activities/             # Temporal activities
+│   ├── signals/                # Temporal signals
+│   ├── app.module.ts
+│   └── main.ts
+└── dist/
+```
+
+## Shared Libraries
+
+### NestJS Libraries (`libraries/nestjs-libraries`)
+
+Shared backend code used by both backend and orchestrator.
+
+```
+libraries/nestjs-libraries/src/
+├── database/
+│   └── prisma/
+│       ├── schema.prisma       # Prisma database schema
+│       └── migrations/
+├── services/                   # Business logic services
+│   ├── email.service.ts
+│   ├── stripe.service.ts
+│   └── ...
+├── integrations/              # Social media integrations
+│   ├── social/
+│   │   ├── x.provider.ts
+│   │   ├── facebook.provider.ts
+│   │   ├── linkedin.provider.ts
+│   │   └── ... (28+ providers)
+│   ├── social.abstract.ts     # Base provider class
+│   └── integration.manager.ts
+├── dtos/                      # Data transfer objects
+│   ├── auth/
+│   └── posts/
+├── chat/                      # AI chat features
+├── agent/                     # AI agent features
+├── emails/                    # Email templates
+├── upload/                    # File upload handling
+└── temporal/                  # Temporal utilities
+```
+
+<Note>
+This is where most of the server-side business logic resides. Both the backend API and orchestrator import from this library.
+</Note>
+
+### React Shared Libraries (`libraries/react-shared-libraries`)
+
+Shared frontend components and utilities.
+
+```
+libraries/react-shared-libraries/src/
+├── components/
+│   ├── layout/
+│   ├── forms/
+│   └── ...
+├── hooks/
+└── helpers/
+```
+
+### Helpers (`libraries/helpers`)
+
+Cross-platform utilities used by both frontend and backend.
+
+```
+libraries/helpers/src/
+├── utils/
+│   ├── custom.fetch.tsx       # Custom fetch hook
+│   ├── timer.ts
+│   └── ...
+├── auth/
+├── decorators/
+└── subdomain/
+```
+
+## Workspace Commands
+
+### Development
+
+<CodeGroup>
+```bash Development (All Apps)
+# Run all apps in parallel
+pnpm dev
+```
+
+```bash Development (Backend + Frontend)
+# Run only backend and frontend
+pnpm dev-backend
+```
+
+```bash Individual Apps
+# Run specific app
+pnpm dev:backend
+pnpm dev:frontend
+pnpm dev:orchestrator
+```
+</CodeGroup>
+
+### Building
+
+<CodeGroup>
+```bash Build All
+# Build all apps
+pnpm build
+```
+
+```bash Build Individual
+# Build specific app
+pnpm build:backend
+pnpm build:frontend
+pnpm build:orchestrator
+```
+</CodeGroup>
+
+### Database
+
+<CodeGroup>
+```bash Generate Prisma Client
+pnpm prisma-generate
+```
+
+```bash Push Schema Changes
+pnpm prisma-db-push
+```
+
+```bash Pull Schema from DB
+pnpm prisma-db-pull
+```
+</CodeGroup>
+
+## Workspace Configuration
+
+The `pnpm-workspace.yaml` defines workspace packages:
+
+```yaml pnpm-workspace.yaml
+packages:
+  - 'apps/*'
+  - 'libraries/*'
+```
+
+## Package Management
+
+### Adding Dependencies
+
+<Warning>
+All dependencies must be added to the **root** `package.json`, not individual workspace packages.
+</Warning>
+
+```bash
+# Add to root dependencies
+pnpm add package-name
+
+# Add to dev dependencies
+pnpm add -D package-name
+```
+
+### Using Dependencies
+
+Each workspace can use any dependency from the root `package.json`:
+
+```typescript
+// In any app or library
+import { Module } from '@nestjs/common';
+import axios from 'axios';
+```
+
+## Internal Package References
+
+Workspaces can reference each other using the `@gitroom` namespace:
+
+```typescript
+// Backend importing from shared library
+import { AuthService } from '@gitroom/nestjs-libraries/services/auth.service';
+import { DatabaseModule } from '@gitroom/nestjs-libraries/database/prisma/database.module';
+
+// Frontend importing from helpers
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch.tsx';
+```
+
+## Build Output
+
+Each app builds to its own `dist/` directory:
+
+```
+apps/backend/dist/        # Backend build
+apps/frontend/dist/       # Frontend build
+apps/orchestrator/dist/   # Orchestrator build
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Use pnpm only">
+    Never use npm or yarn. The project is configured specifically for pnpm.
+  </Step>
+  
+  <Step title="Add dependencies to root">
+    All dependencies go in the root `package.json`, not individual packages.
+  </Step>
+  
+  <Step title="Share code via libraries">
+    Extract reusable code to shared libraries instead of duplicating across apps.
+  </Step>
+  
+  <Step title="Maintain separation">
+    Keep backend logic in `nestjs-libraries`, frontend logic in `react-shared-libraries`, and cross-platform utilities in `helpers`.
+  </Step>
+  
+  <Step title="Run linting from root">
+    Always run linting and formatting commands from the root directory.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Backend Development" icon="server" href="/development/backend/overview">
+    Learn about backend architecture and patterns
+  </Card>
+  <Card title="Frontend Development" icon="browser" href="/development/frontend/overview">
+    Explore frontend structure and components
+  </Card>
+</CardGroup>

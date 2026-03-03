@@ -1,0 +1,566 @@
+---
+title: Authentication Configuration
+description: Configure OAuth authentication for social media platforms and generic OAuth providers
+---
+
+# Authentication Configuration
+
+Postiz supports OAuth authentication for 28+ social media platforms and generic OAuth 2.0 providers like Authentik, Keycloak, and others.
+
+## Overview
+
+Postiz uses official, platform-approved OAuth flows for authentication:
+
+<Info>
+**Postiz Compliance**:
+- Uses official OAuth flows approved by each platform
+- Never stores or proxies API keys
+- Users authenticate directly with social platforms
+- No automation or scraping of platform content
+</Info>
+
+## User Authentication
+
+By default, Postiz uses JWT-based authentication with email/password registration.
+
+### Disable Public Registration
+
+To prevent new user signups:
+
+```bash .env
+DISABLE_REGISTRATION="true"
+```
+
+### Email Verification
+
+Enable email verification with Resend:
+
+```bash .env
+RESEND_API_KEY="re_yourApiKey"
+EMAIL_FROM_ADDRESS="noreply@yourdomain.com"
+EMAIL_FROM_NAME="Postiz"
+```
+
+<Note>
+When `RESEND_API_KEY` is set, user activation emails are required. If omitted, users are activated automatically.
+</Note>
+
+## Generic OAuth Provider
+
+Postiz supports generic OAuth 2.0 providers for user authentication (SSO).
+
+### Supported Providers
+
+- Authentik
+- Keycloak
+- Auth0
+- Okta
+- Any OpenID Connect compatible provider
+
+### Configuration
+
+<Steps>
+  <Step title="Enable Generic OAuth">
+    ```bash .env
+    POSTIZ_GENERIC_OAUTH="true"
+    ```
+  </Step>
+  
+  <Step title="Configure Provider Details">
+    ```bash .env
+    NEXT_PUBLIC_POSTIZ_OAUTH_DISPLAY_NAME="Authentik"
+    NEXT_PUBLIC_POSTIZ_OAUTH_LOGO_URL="https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/png/authentik.png"
+    ```
+  </Step>
+  
+  <Step title="Set OAuth Endpoints">
+    ```bash .env
+    POSTIZ_OAUTH_URL="https://auth.example.com"
+    POSTIZ_OAUTH_AUTH_URL="https://auth.example.com/application/o/authorize"
+    POSTIZ_OAUTH_TOKEN_URL="https://auth.example.com/application/o/token"
+    POSTIZ_OAUTH_USERINFO_URL="https://auth.example.com/application/o/userinfo"
+    ```
+  </Step>
+  
+  <Step title="Configure Client Credentials">
+    ```bash .env
+    POSTIZ_OAUTH_CLIENT_ID="your-oauth-client-id"
+    POSTIZ_OAUTH_CLIENT_SECRET="your-oauth-client-secret"
+    POSTIZ_OAUTH_SCOPE="openid profile email"
+    ```
+  </Step>
+</Steps>
+
+### Authentik Example
+
+<CodeGroup>
+```bash .env
+POSTIZ_GENERIC_OAUTH="true"
+NEXT_PUBLIC_POSTIZ_OAUTH_DISPLAY_NAME="Authentik"
+NEXT_PUBLIC_POSTIZ_OAUTH_LOGO_URL="https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/png/authentik.png"
+
+POSTIZ_OAUTH_URL="https://auth.yourdomain.com"
+POSTIZ_OAUTH_AUTH_URL="https://auth.yourdomain.com/application/o/authorize"
+POSTIZ_OAUTH_TOKEN_URL="https://auth.yourdomain.com/application/o/token"
+POSTIZ_OAUTH_USERINFO_URL="https://auth.yourdomain.com/application/o/userinfo"
+
+POSTIZ_OAUTH_CLIENT_ID="your-authentik-client-id"
+POSTIZ_OAUTH_CLIENT_SECRET="your-authentik-secret"
+POSTIZ_OAUTH_SCOPE="openid profile email"
+```
+
+```yaml Authentik Provider Config
+# In Authentik, create a new OAuth2/OpenID Provider:
+# Name: Postiz
+# Client Type: Confidential
+# Redirect URIs: https://postiz.yourdomain.com/api/auth/callback/oauth
+# Signing Key: (auto-generated)
+# Scopes: openid, profile, email
+```
+</CodeGroup>
+
+### Keycloak Example
+
+```bash .env
+POSTIZ_GENERIC_OAUTH="true"
+NEXT_PUBLIC_POSTIZ_OAUTH_DISPLAY_NAME="Keycloak"
+NEXT_PUBLIC_POSTIZ_OAUTH_LOGO_URL="https://www.keycloak.org/resources/images/logo.svg"
+
+POSTIZ_OAUTH_URL="https://keycloak.yourdomain.com/realms/master"
+POSTIZ_OAUTH_AUTH_URL="https://keycloak.yourdomain.com/realms/master/protocol/openid-connect/auth"
+POSTIZ_OAUTH_TOKEN_URL="https://keycloak.yourdomain.com/realms/master/protocol/openid-connect/token"
+POSTIZ_OAUTH_USERINFO_URL="https://keycloak.yourdomain.com/realms/master/protocol/openid-connect/userinfo"
+
+POSTIZ_OAUTH_CLIENT_ID="postiz"
+POSTIZ_OAUTH_CLIENT_SECRET="your-keycloak-secret"
+POSTIZ_OAUTH_SCOPE="openid profile email"
+```
+
+## Social Media OAuth
+
+Configure OAuth credentials for each social media platform you want to integrate.
+
+### Redirect URI Format
+
+All OAuth providers need this redirect URI:
+
+```
+https://your-postiz-domain.com/api/integrations/social/{platform}/callback
+```
+
+Replace `{platform}` with: `twitter`, `linkedin`, `facebook`, `instagram`, `youtube`, `tiktok`, `pinterest`, `reddit`, `github`, `discord`, `slack`, `mastodon`, `dribbble`, `threads`
+
+## Platform Setup Guides
+
+### X (Twitter)
+
+<Steps>
+  <Step title="Create Twitter App">
+    1. Go to [Twitter Developer Portal](https://developer.twitter.com/)
+    2. Create a new App
+    3. Enable OAuth 2.0
+    4. Add redirect URI: `https://yourdomain.com/api/integrations/social/twitter/callback`
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    X_API_KEY="your-twitter-api-key"
+    X_API_SECRET="your-twitter-api-secret"
+    ```
+  </Step>
+</Steps>
+
+### LinkedIn
+
+<Steps>
+  <Step title="Create LinkedIn App">
+    1. Go to [LinkedIn Developers](https://www.linkedin.com/developers/apps)
+    2. Create a new App
+    3. Add redirect URL: `https://yourdomain.com/api/integrations/social/linkedin/callback`
+    4. Request access to required products:
+       - Sign In with LinkedIn
+       - Share on LinkedIn
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    LINKEDIN_CLIENT_ID="your-linkedin-client-id"
+    LINKEDIN_CLIENT_SECRET="your-linkedin-client-secret"
+    ```
+  </Step>
+</Steps>
+
+### Facebook & Instagram
+
+<Steps>
+  <Step title="Create Facebook App">
+    1. Go to [Meta for Developers](https://developers.facebook.com/)
+    2. Create a new App
+    3. Add Facebook Login product
+    4. Add redirect URI: `https://yourdomain.com/api/integrations/social/facebook/callback`
+    5. Request permissions:
+       - `pages_manage_posts`
+       - `pages_read_engagement`
+       - `instagram_basic`
+       - `instagram_content_publish`
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    FACEBOOK_APP_ID="your-facebook-app-id"
+    FACEBOOK_APP_SECRET="your-facebook-app-secret"
+    ```
+  </Step>
+</Steps>
+
+<Note>
+Facebook and Instagram share the same app credentials.
+</Note>
+
+### Threads
+
+<Steps>
+  <Step title="Create Threads App">
+    1. Use the same Facebook App (Threads uses Meta's platform)
+    2. Add redirect URI: `https://yourdomain.com/api/integrations/social/threads/callback`
+    3. Request Threads-specific permissions
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    THREADS_APP_ID="your-threads-app-id"
+    THREADS_APP_SECRET="your-threads-app-secret"
+    ```
+  </Step>
+</Steps>
+
+### YouTube
+
+<Steps>
+  <Step title="Create Google Cloud Project">
+    1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+    2. Create a new Project
+    3. Enable YouTube Data API v3
+    4. Create OAuth 2.0 credentials
+    5. Add redirect URI: `https://yourdomain.com/api/integrations/social/youtube/callback`
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    YOUTUBE_CLIENT_ID="your-google-client-id"
+    YOUTUBE_CLIENT_SECRET="your-google-client-secret"
+    ```
+  </Step>
+</Steps>
+
+### TikTok
+
+<Steps>
+  <Step title="Create TikTok App">
+    1. Go to [TikTok Developers](https://developers.tiktok.com/)
+    2. Create a new App
+    3. Add redirect URI: `https://yourdomain.com/api/integrations/social/tiktok/callback`
+    4. Request permissions:
+       - `user.info.basic`
+       - `video.publish`
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    TIKTOK_CLIENT_ID="your-tiktok-client-id"
+    TIKTOK_CLIENT_SECRET="your-tiktok-client-secret"
+    ```
+  </Step>
+</Steps>
+
+### Pinterest
+
+<Steps>
+  <Step title="Create Pinterest App">
+    1. Go to [Pinterest Developers](https://developers.pinterest.com/)
+    2. Create a new App
+    3. Add redirect URI: `https://yourdomain.com/api/integrations/social/pinterest/callback`
+    4. Request scopes:
+       - `pins:read`
+       - `pins:write`
+       - `boards:read`
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    PINTEREST_CLIENT_ID="your-pinterest-client-id"
+    PINTEREST_CLIENT_SECRET="your-pinterest-client-secret"
+    ```
+  </Step>
+</Steps>
+
+### Reddit
+
+<Steps>
+  <Step title="Create Reddit App">
+    1. Go to [Reddit App Preferences](https://www.reddit.com/prefs/apps)
+    2. Create a new App (web app)
+    3. Add redirect URI: `https://yourdomain.com/api/integrations/social/reddit/callback`
+    4. Note your Client ID and Secret
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    REDDIT_CLIENT_ID="your-reddit-client-id"
+    REDDIT_CLIENT_SECRET="your-reddit-client-secret"
+    ```
+  </Step>
+</Steps>
+
+### Discord
+
+<Steps>
+  <Step title="Create Discord App">
+    1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+    2. Create a new Application
+    3. Add redirect URI in OAuth2 settings: `https://yourdomain.com/api/integrations/social/discord/callback`
+    4. Create a Bot and get the token
+    5. Enable required bot permissions:
+       - Send Messages
+       - Embed Links
+       - Attach Files
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    DISCORD_CLIENT_ID="your-discord-client-id"
+    DISCORD_CLIENT_SECRET="your-discord-client-secret"
+    DISCORD_BOT_TOKEN_ID="your-discord-bot-token"
+    ```
+  </Step>
+</Steps>
+
+### Slack
+
+<Steps>
+  <Step title="Create Slack App">
+    1. Go to [Slack API](https://api.slack.com/apps)
+    2. Create a new App
+    3. Add redirect URL: `https://yourdomain.com/api/integrations/social/slack/callback`
+    4. Add OAuth scopes:
+       - `chat:write`
+       - `files:write`
+       - `channels:read`
+    5. Get signing secret from Basic Information
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    SLACK_ID="your-slack-client-id"
+    SLACK_SECRET="your-slack-client-secret"
+    SLACK_SIGNING_SECRET="your-slack-signing-secret"
+    ```
+  </Step>
+</Steps>
+
+### Mastodon
+
+<Steps>
+  <Step title="Configure Mastodon Instance">
+    Mastodon requires per-instance OAuth apps. Users will authenticate with their specific instance.
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    MASTODON_URL="https://mastodon.social"
+    MASTODON_CLIENT_ID="your-mastodon-client-id"
+    MASTODON_CLIENT_SECRET="your-mastodon-client-secret"
+    ```
+  </Step>
+</Steps>
+
+<Note>
+Mastodon apps are instance-specific. The default is `mastodon.social`, but users can connect to any instance.
+</Note>
+
+### GitHub
+
+<Steps>
+  <Step title="Create GitHub OAuth App">
+    1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
+    2. Create a new OAuth App
+    3. Add callback URL: `https://yourdomain.com/api/integrations/social/github/callback`
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    GITHUB_CLIENT_ID="your-github-client-id"
+    GITHUB_CLIENT_SECRET="your-github-client-secret"
+    ```
+  </Step>
+</Steps>
+
+### Dribbble
+
+<Steps>
+  <Step title="Create Dribbble App">
+    1. Go to [Dribbble Developers](https://dribbble.com/account/applications)
+    2. Register a new application
+    3. Add callback URL: `https://yourdomain.com/api/integrations/social/dribbble/callback`
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash .env
+    DRIBBBLE_CLIENT_ID="your-dribbble-client-id"
+    DRIBBBLE_CLIENT_SECRET="your-dribbble-client-secret"
+    ```
+  </Step>
+</Steps>
+
+## Newsletter Integrations
+
+### Beehiiv
+
+```bash .env
+BEEHIIVE_API_KEY="your-beehiiv-api-key"
+BEEHIIVE_PUBLICATION_ID="your-publication-id"
+```
+
+### Listmonk
+
+```bash .env
+LISTMONK_DOMAIN="https://newsletter.yourdomain.com"
+LISTMONK_USER="your-listmonk-username"
+LISTMONK_API_KEY="your-listmonk-api-key"
+LISTMONK_LIST_ID="your-list-id"
+```
+
+## Cookie-Based Integrations
+
+### Chrome Extension Setup
+
+Some platforms (like Skool) require cookie-based authentication via a Chrome extension:
+
+```bash .env
+EXTENSION_ID="your-chrome-extension-id"
+```
+
+<Info>
+The Chrome extension allows users to authenticate with platforms that don't provide official APIs.
+</Info>
+
+## Testing OAuth Configuration
+
+<Steps>
+  <Step title="Verify Redirect URIs">
+    Ensure all OAuth apps have the correct redirect URIs configured.
+  </Step>
+  
+  <Step title="Test Each Platform">
+    1. Start Postiz
+    2. Go to Settings > Integrations
+    3. Click "Connect" for each platform
+    4. Complete the OAuth flow
+    5. Verify the connection succeeds
+  </Step>
+  
+  <Step title="Check Logs">
+    ```bash
+    docker compose logs -f postiz | grep -i oauth
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Common Issues
+
+#### Redirect URI Mismatch
+
+<Warning>
+The redirect URI in your OAuth app MUST exactly match:
+
+```
+https://yourdomain.com/api/integrations/social/{platform}/callback
+```
+
+Common mistakes:
+- Using `http://` instead of `https://`
+- Missing `/callback` at the end
+- Wrong platform name
+- Trailing slash
+</Warning>
+
+#### Invalid Client Credentials
+
+```bash
+# Verify credentials are set
+docker compose exec postiz env | grep -i "CLIENT_ID\|CLIENT_SECRET"
+```
+
+#### OAuth App Not Approved
+
+Some platforms require app review before going live:
+
+- **Facebook/Instagram**: Submit for App Review
+- **TikTok**: Request production access
+- **YouTube**: Verify domain ownership
+- **LinkedIn**: Request product access
+
+#### Scope Permissions Denied
+
+Ensure your OAuth app requests the correct scopes:
+
+```bash
+# Check required scopes in logs
+docker compose logs postiz | grep -i "scope"
+```
+
+### Debug Mode
+
+Enable verbose OAuth logging:
+
+```bash .env
+NODE_ENV="development"
+LOG_LEVEL="debug"
+```
+
+## Security Best Practices
+
+<Warning>
+1. **Use HTTPS** for all production deployments
+2. **Rotate secrets regularly** (every 90 days recommended)
+3. **Restrict OAuth app permissions** to only what's needed
+4. **Monitor failed login attempts**
+5. **Enable 2FA** on all developer accounts
+6. **Review OAuth app access** regularly
+7. **Use environment variables** - never hardcode secrets
+</Warning>
+
+## Rate Limits
+
+Be aware of platform API rate limits:
+
+| Platform | Rate Limit | Notes |
+|----------|------------|-------|
+| X (Twitter) | 300 posts/3h | Per user |
+| LinkedIn | 100 posts/day | Per user |
+| Facebook | 200 posts/h | Per page |
+| Instagram | 25 posts/day | Per account |
+| YouTube | 10,000 units/day | Quota based |
+| TikTok | 30 posts/day | Per user |
+
+<Tip>
+Postiz automatically handles rate limiting and retries.
+</Tip>
+
+## Next Steps
+
+<Steps>
+  <Step title="Configure Storage">
+    Set up [storage configuration](/self-hosting/storage-configuration) for media uploads
+  </Step>
+  
+  <Step title="Review Environment Variables">
+    Check the complete [environment variables reference](/self-hosting/environment-variables)
+  </Step>
+  
+  <Step title="Start Posting">
+    Connect your social accounts and start scheduling posts!
+  </Step>
+</Steps>

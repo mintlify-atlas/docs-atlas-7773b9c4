@@ -1,0 +1,289 @@
+---
+title: 'LinkedIn Integration'
+description: 'Share professional content to LinkedIn personal profiles and company pages'
+---
+
+## Overview
+
+Postiz enables professional content sharing on LinkedIn with support for personal profiles and company pages, including images, videos, documents, and carousel posts.
+
+## Authentication
+
+LinkedIn uses OAuth 2.0 with refresh tokens for long-term access.
+
+<Steps>
+  <Step title="Connect LinkedIn">
+    Click "Connect LinkedIn" in Integrations
+  </Step>
+  
+  <Step title="Authorize Access">
+    Grant all requested permissions for full functionality
+  </Step>
+  
+  <Step title="Account Ready">
+    Your LinkedIn profile is now connected
+  </Step>
+</Steps>
+
+### Required Permissions
+
+- `openid` - Basic authentication
+- `profile` - Profile information
+- `w_member_social` - Post as member
+- `r_basicprofile` - Read profile
+- `rw_organization_admin` - Manage company pages
+- `w_organization_social` - Post to company pages
+- `r_organization_social` - Read company data
+
+<Note>
+  Tokens are automatically refreshed by Postiz to maintain continuous access.
+</Note>
+
+## Supported Features
+
+### Content Types
+
+<Tabs>
+  <Tab title="Text Posts">
+    - **Maximum**: 3000 characters
+    - Rich text with special character escaping
+    - Company mentions supported
+    - URLs automatically linked
+  </Tab>
+  
+  <Tab title="Image Posts">
+    - Single image or multi-image carousel
+    - Images converted to JPEG
+    - Resized to 1000px width
+    - Animated GIFs supported
+  </Tab>
+  
+  <Tab title="Video Posts">
+    - Single video per post (MP4)
+    - Chunked upload for large files
+    - Multi-part upload supported
+    - Video finalization required
+  </Tab>
+  
+  <Tab title="Document/PDF Posts">
+    - Upload PDF documents
+    - Multiple images converted to PDF carousel
+    - Custom carousel naming
+    - PDF preserved page dimensions
+  </Tab>
+</Tabs>
+
+### Media Requirements
+
+<Warning>
+  **LinkedIn Media Rules:**
+  - Maximum **1 video** when selecting video type
+  - Minimum **2 images** for carousel posts (images only)
+  - Cannot mix images and videos
+  - If uploading a video, only one attachment allowed
+</Warning>
+
+## Advanced Features
+
+### Image Carousel to PDF
+
+Convert multiple images into a professional PDF carousel:
+
+<Steps>
+  <Step title="Enable Carousel Mode">
+    Select "Post as Images Carousel" in settings
+  </Step>
+  
+  <Step title="Upload Images">
+    Add 2+ images to your post
+  </Step>
+  
+  <Step title="Automatic Conversion">
+    Images are automatically converted to a single PDF
+  </Step>
+  
+  <Step title="Custom Title">
+    Optionally set a custom carousel name
+  </Step>
+</Steps>
+
+<Info>
+  PDF carousels maintain the largest image's dimensions and center smaller images within the same page size.
+</Info>
+
+### Company Mentions
+
+Mention companies in your posts:
+
+```typescript
+// Format: @[Company Name](urn:li:organization:{id})
+"Check out @[Microsoft](urn:li:organization:1234) latest product!"
+```
+
+Search for companies by vanity name:
+```typescript
+POST /company
+{
+  url: "https://www.linkedin.com/company/microsoft"
+}
+```
+
+### Post Comments
+
+Add comments to LinkedIn posts:
+- Personal or company page comments
+- Support for different account types
+- Multi-account commenting with Post Plugs
+
+### Post Plugs
+
+<AccordionGroup>
+  <Accordion title="Add Comments from Other Accounts">
+    Boost engagement by commenting from multiple LinkedIn accounts:
+    ```typescript
+    {
+      identifier: 'linkedin-add-comment',
+      comment: "Great insights!"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Re-post from Other Accounts">
+    Share your post to other connected LinkedIn accounts/pages:
+    ```typescript
+    {
+      identifier: 'linkedin-repost-post-users'
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Media Upload Process
+
+### Image Upload
+
+<Steps>
+  <Step title="Initialize Upload">
+    Request upload URL from LinkedIn API
+  </Step>
+  
+  <Step title="Process Image">
+    Convert to JPEG, resize to 1000px width
+  </Step>
+  
+  <Step title="Upload">
+    Upload processed image in chunks (2MB max)
+  </Step>
+</Steps>
+
+### Video Upload
+
+<Steps>
+  <Step title="Initialize Upload">
+    Request video upload endpoint
+  </Step>
+  
+  <Step title="Upload Chunks">
+    Upload video in 2MB chunks
+  </Step>
+  
+  <Step title="Collect ETags">
+    Store ETag from each chunk upload
+  </Step>
+  
+  <Step title="Finalize">
+    Finalize video with all ETags
+  </Step>
+</Steps>
+
+<Info>
+  Large files are automatically split into 2MB chunks for reliable upload.
+</Info>
+
+## Rate Limits
+
+<Warning>
+  **LinkedIn Rate Limits:**
+  - Maximum 2 concurrent posting jobs
+  - Professional posting limits apply
+  - API throttling for high-frequency posts
+  - Refresh token required (wait between requests)
+</Warning>
+
+## Error Handling
+
+Common LinkedIn errors:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| Unable to obtain activity | Temporary issue | Retry automatically |
+| Resource is forbidden | Permission issue | Check account permissions |
+| Token expired | Refresh needed | Automatic token refresh |
+
+<Note>
+  LinkedIn errors are automatically retried. Postiz handles "Unable to obtain activity" and "resource is forbidden" errors with automatic retry logic.
+</Note>
+
+## Text Formatting
+
+LinkedIn requires special character escaping:
+
+```typescript
+Escaped characters: \ < > # ~ _ | [ ] * ( ) { } @
+
+Example:
+"Check this #hashtag" → "Check this \#hashtag"
+"Cost: $50 (USD)" → "Cost: $50 \(USD\)"
+```
+
+<Info>
+  Company mentions in the format `@[Name](urn:li:organization:id)` are preserved and not escaped.
+</Info>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Professional Tone">
+    LinkedIn content performs best with professional, value-driven posts
+  </Card>
+  
+  <Card title="Image Quality">
+    Use high-quality images, 1200x627px recommended for best display
+  </Card>
+  
+  <Card title="Hashtag Strategy">
+    Use 3-5 relevant hashtags for optimal reach
+  </Card>
+  
+  <Card title="Posting Time">
+    Best engagement: Tuesday-Thursday, 7-8 AM and 5-6 PM
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Upload Failures">
+    If uploads fail:
+    - Check file size (videos can be large)
+    - Verify format (JPEG for images, MP4 for video)
+    - Ensure stable internet connection
+    - Try again - LinkedIn may have temporary issues
+  </Accordion>
+  
+  <Accordion title="Permission Errors">
+    If you see permission errors:
+    - Verify all OAuth scopes were granted
+    - Check company page admin status
+    - Reconnect your account
+    - Ensure organization access is enabled
+  </Accordion>
+  
+  <Accordion title="Carousel Not Working">
+    PDF carousel requirements:
+    - Enable "Post as Images Carousel"
+    - Upload at least 2 images
+    - All images should be compatible formats
+    - Check that images loaded successfully
+  </Accordion>
+</AccordionGroup>

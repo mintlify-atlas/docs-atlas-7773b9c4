@@ -1,0 +1,413 @@
+---
+title: Testing Strategy
+description: Testing methodologies and best practices for Postiz
+---
+
+## Overview
+
+Postiz uses a comprehensive testing strategy covering unit tests, integration tests, and end-to-end tests. This ensures code quality, prevents regressions, and maintains system reliability.
+
+## Testing Stack
+
+| Tool | Purpose | Usage |
+|------|---------|-------|
+| **Jest** | Unit & integration testing | Backend, shared libraries |
+| **Vitest** | Fast unit testing | Alternative to Jest |
+| **Testing Library** | React component testing | Frontend components |
+| **MSW** | API mocking | Integration tests |
+| **Playwright** | E2E testing | Full user flows |
+
+## Test Structure
+
+### Test Pyramid
+
+```
+       E2E Tests
+    (Few, Slow, High Value)
+    ┌────────────────┐
+    │                │
+    └────────────────┘
+    
+  Integration Tests
+(Moderate, Medium Speed)
+┌──────────────────────────────┐
+│                              │
+└──────────────────────────────┘
+
+      Unit Tests
+  (Many, Fast, Focused)
+┌──────────────────────────────────────────┐
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+## Unit Tests
+
+### Backend Unit Tests
+
+**Test Services:**
+
+```typescript auth.service.spec.ts
+import { Test, TestingModule } from '@nestjs/testing';
+import { AuthService } from './auth.service';
+import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
+
+describe('AuthService', () => {
+  let service: AuthService;
+  let usersService: jest.Mocked<UsersService>;
+  let orgService: jest.Mocked<OrganizationService>;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        {
+          provide: UsersService,
+          useValue: {
+            getUserByEmail: jest.fn(),
+            create: jest.fn(),
+          },
+        },
+        {
+          provide: OrganizationService,
+          useValue: {
+            createOrgAndUser: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<AuthService>(AuthService);
+    usersService = module.get(UsersService);
+    orgService = module.get(OrganizationService);
+  });
+
+  describe('register', () => {
+    it('should create a new user and organization', async () => {
+      const dto = {
+        email: 'test@example.com',
+        password: 'password123',
+        name: 'Test User',
+      };
+
+      usersService.getUserByEmail.mockResolvedValue(null);
+      orgService.createOrgAndUser.mockResolvedValue({
+        id: 'org-123',
+        users: [{ user: { id: 'user-123', email: dto.email } }],
+      });
+
+      const result = await service.register(dto);
+
+      expect(result).toHaveProperty('jwt');
+      expect(usersService.getUserByEmail).toHaveBeenCalledWith(dto.email);
+      expect(orgService.createOrgAndUser).toHaveBeenCalledWith(dto);
+    });
+
+    it('should throw error if email exists', async () => {
+      const dto = { email: 'existing@example.com', password: 'pass' };
+      
+      usersService.getUserByEmail.mockResolvedValue({
+        id: 'user-123',
+        email: dto.email,
+      });
+
+      await expect(service.register(dto)).rejects.toThrow('Email already exists');
+    });
+  });
+});
+```
+
+### Frontend Unit Tests
+
+**Test Components:**
+
+```typescript Button.test.tsx
+import { render, screen, fireEvent } from '@testing-library/react';
+import { Button } from './Button';
+
+describe('Button', () => {
+  it('renders with children', () => {
+    render(<Button>Click me</Button>);
+    expect(screen.getByText('Click me')).toBeInTheDocument();
+  });
+
+  it('calls onClick when clicked', () => {
+    const handleClick = jest.fn();
+    render(<Button onClick={handleClick}>Click</Button>);
+    
+    fireEvent.click(screen.getByText('Click'));
+    expect(handleClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('is disabled when disabled prop is true', () => {
+    render(<Button disabled>Click</Button>);
+    const button = screen.getByRole('button');
+    expect(button).toBeDisabled();
+  });
+
+  it('applies variant classes', () => {
+    const { rerender } = render(<Button variant="primary">Click</Button>);
+    expect(screen.getByRole('button')).toHaveClass('bg-btnPrimary');
+
+    rerender(<Button variant="secondary">Click</Button>);
+    expect(screen.getByRole('button')).toHaveClass('bg-btnSimple');
+  });
+});
+```
+
+**Test Hooks:**
+
+```typescript usePosts.test.ts
+import { renderHook, waitFor } from '@testing-library/react';
+import { usePosts } from './usePosts';
+
+// Mock useFetch
+jest.mock('@gitroom/helpers/utils/custom.fetch.tsx', () => ({
+  useFetch: () => jest.fn().mockResolvedValue([
+    { id: '1', title: 'Post 1' },
+    { id: '2', title: 'Post 2' },
+  ]),
+}));
+
+describe('usePosts', () => {
+  it('fetches posts successfully', async () => {
+    const { result } = renderHook(() => usePosts());
+
+    await waitFor(() => {
+      expect(result.current.data).toHaveLength(2);
+    });
+
+    expect(result.current.data[0].title).toBe('Post 1');
+  });
+});
+```
+
+## Integration Tests
+
+### API Integration Tests
+
+```typescript auth.controller.integration.spec.ts
+import { Test } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import * as request from 'supertest';
+import { AppModule } from '../app.module';
+
+describe('AuthController (integration)', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  describe('POST /auth/register', () => {
+    it('should register a new user', () => {
+      return request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email: 'test@example.com',
+          password: 'password123',
+          name: 'Test User',
+        })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('register', true);
+        });
+    });
+
+    it('should return 400 for existing email', () => {
+      return request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email: 'existing@example.com',
+          password: 'password',
+        })
+        .expect(400);
+    });
+  });
+});
+```
+
+### Database Integration Tests
+
+```typescript posts.repository.spec.ts
+import { Test } from '@nestjs/testing';
+import { DatabaseModule } from '@gitroom/nestjs-libraries/database/database.module';
+import { PostsRepository } from './posts.repository';
+
+describe('PostsRepository (integration)', () => {
+  let repository: PostsRepository;
+
+  beforeAll(async () => {
+    const module = await Test.createTestingModule({
+      imports: [DatabaseModule],
+      providers: [PostsRepository],
+    }).compile();
+
+    repository = module.get<PostsRepository>(PostsRepository);
+  });
+
+  beforeEach(async () => {
+    // Clean database
+    await repository.deleteAll();
+  });
+
+  it('should create a post', async () => {
+    const post = await repository.create({
+      content: 'Test post',
+      organizationId: 'org-123',
+    });
+
+    expect(post).toHaveProperty('id');
+    expect(post.content).toBe('Test post');
+  });
+
+  it('should find posts by organization', async () => {
+    await repository.create({
+      content: 'Post 1',
+      organizationId: 'org-123',
+    });
+    await repository.create({
+      content: 'Post 2',
+      organizationId: 'org-123',
+    });
+
+    const posts = await repository.findByOrganization('org-123');
+    expect(posts).toHaveLength(2);
+  });
+});
+```
+
+## End-to-End Tests
+
+### Playwright E2E Tests
+
+```typescript e2e/auth.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Authentication', () => {
+  test('user can register and login', async ({ page }) => {
+    // Visit registration page
+    await page.goto('/auth/register');
+
+    // Fill registration form
+    await page.fill('[name="email"]', 'test@example.com');
+    await page.fill('[name="password"]', 'password123');
+    await page.fill('[name="name"]', 'Test User');
+    await page.click('button[type="submit"]');
+
+    // Should redirect to dashboard
+    await expect(page).toHaveURL('/launches');
+    await expect(page.locator('h1')).toContainText('Calendar');
+
+    // Logout
+    await page.click('[data-testid="user-menu"]');
+    await page.click('[data-testid="logout"]');
+
+    // Login again
+    await page.goto('/auth/login');
+    await page.fill('[name="email"]', 'test@example.com');
+    await page.fill('[name="password"]', 'password123');
+    await page.click('button[type="submit"]');
+
+    // Should be logged in
+    await expect(page).toHaveURL('/launches');
+  });
+});
+```
+
+## Running Tests
+
+### Unit Tests
+
+```bash
+# Run all tests
+pnpm test
+
+# Run tests in watch mode
+pnpm test --watch
+
+# Run specific test file
+pnpm test auth.service.spec.ts
+
+# Run with coverage
+pnpm test --coverage
+```
+
+### E2E Tests
+
+```bash
+# Run E2E tests
+pnpm test:e2e
+
+# Run with UI
+pnpm test:e2e --ui
+
+# Run specific test
+pnpm test:e2e auth.spec.ts
+```
+
+## Test Coverage
+
+### Generate Coverage Report
+
+```bash
+pnpm test --coverage
+```
+
+### Coverage Targets
+
+- **Statements**: 80%+
+- **Branches**: 75%+
+- **Functions**: 80%+
+- **Lines**: 80%+
+
+## Best Practices
+
+<Steps>
+  <Step title="Follow AAA pattern">
+    **Arrange** - Setup test data
+    **Act** - Execute the code
+    **Assert** - Verify results
+  </Step>
+  
+  <Step title="Test behavior, not implementation">
+    Test what the code does, not how it does it.
+  </Step>
+  
+  <Step title="Use descriptive test names">
+    Test names should clearly describe what is being tested.
+  </Step>
+  
+  <Step title="Keep tests independent">
+    Each test should run independently without relying on others.
+  </Step>
+  
+  <Step title="Mock external dependencies">
+    Mock API calls, databases, and third-party services.
+  </Step>
+  
+  <Step title="Test edge cases">
+    Don't just test happy paths. Test errors, edge cases, and boundaries.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Contributing" icon="code-pull-request" href="/development/contributing">
+    Start contributing to Postiz
+  </Card>
+  <Card title="Code Standards" icon="book" href="/development/code-standards">
+    Follow code standards
+  </Card>
+</CardGroup>

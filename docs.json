@@ -1,122 +1,167 @@
 {
   "$schema": "https://mintlify.com/docs.json",
+  "name": "Postiz",
   "theme": "mint",
-  "name": "Mint Starter Kit",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#7c3aed",
+    "light": "#a78bfa",
+    "dark": "#5b21b6"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/gitroomhq/postiz-app"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/gitroomhq/postiz-app"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Features",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "features/scheduling",
+              "features/calendar",
+              "features/analytics",
+              "features/ai-features",
+              "features/team-collaboration",
+              "features/media-library"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Social Platforms",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "platforms/overview",
+              "platforms/x-twitter",
+              "platforms/instagram",
+              "platforms/facebook",
+              "platforms/linkedin",
+              "platforms/youtube",
+              "platforms/tiktok",
+              "platforms/reddit",
+              "platforms/discord",
+              "platforms/slack",
+              "platforms/bluesky",
+              "platforms/mastodon",
+              "platforms/threads",
+              "platforms/pinterest"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Self-Hosting",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "self-hosting/overview",
+              "self-hosting/docker-compose",
+              "self-hosting/environment-variables",
+              "self-hosting/database-setup",
+              "self-hosting/authentication",
+              "self-hosting/storage-configuration"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/oauth-apps",
+              "configuration/email-setup",
+              "configuration/ai-integration",
+              "configuration/billing-stripe",
+              "configuration/short-links"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Getting Started",
             "pages": [
-              "api-reference/introduction"
+              "api/overview",
+              "api/authentication",
+              "api/rate-limits"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Endpoints",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/posts/create-post",
+              "api/posts/list-posts",
+              "api/posts/delete-post",
+              "api/integrations/list-integrations",
+              "api/media/upload-media"
+            ]
+          },
+          {
+            "group": "SDK & CLI",
+            "pages": [
+              "api/sdk/nodejs-sdk",
+              "api/cli/overview",
+              "api/cli/commands"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developer Guide",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "development/architecture",
+              "development/monorepo-structure",
+              "development/tech-stack"
+            ]
+          },
+          {
+            "group": "Backend Development",
+            "pages": [
+              "development/backend/overview",
+              "development/backend/controllers",
+              "development/backend/services",
+              "development/backend/database-schema"
+            ]
+          },
+          {
+            "group": "Frontend Development",
+            "pages": [
+              "development/frontend/overview",
+              "development/frontend/components",
+              "development/frontend/routing",
+              "development/frontend/styling"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "development/integrations/creating-provider",
+              "development/integrations/oauth-flow",
+              "development/integrations/testing"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "development/contributing",
+              "development/code-standards",
+              "development/testing"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

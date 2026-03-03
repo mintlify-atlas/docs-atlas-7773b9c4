@@ -1,0 +1,445 @@
+---
+title: OAuth Flow Implementation
+description: Understanding OAuth 2.0 implementation in Postiz integrations
+---
+
+## Overview
+
+Postiz uses **OAuth 2.0** to securely connect user accounts from various social media platforms. Each integration implements a standard OAuth flow with platform-specific variations.
+
+## OAuth 2.0 Flow
+
+### Standard Authorization Code Flow
+
+<Steps>
+  <Step title="Generate Authorization URL">
+    User clicks "Connect" → Generate OAuth URL with state parameter
+  </Step>
+  
+  <Step title="User Authorization">
+    Redirect to platform → User authorizes → Platform redirects back with code
+  </Step>
+  
+  <Step title="Exchange Code for Token">
+    Backend exchanges authorization code for access token and refresh token
+  </Step>
+  
+  <Step title="Store Credentials">
+    Save tokens securely in database, schedule automatic token refresh
+  </Step>
+</Steps>
+
+## Implementation
+
+### 1. Generate Authorization URL
+
+The `generateAuthUrl()` method creates the OAuth URL:
+
+```typescript
+import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
+
+async generateAuthUrl() {
+  // Generate random state for CSRF protection
+  const state = makeId(6);
+  
+  // Optional: Generate code verifier for PKCE
+  const codeVerifier = makeId(30);
+  
+  const params = new URLSearchParams({
+    client_id: process.env.PLATFORM_CLIENT_ID!,
+    redirect_uri: `${process.env.FRONTEND_URL}/integrations/social/platform`,
+    response_type: 'code',
+    scope: this.scopes.join(' '),
+    state: state,
+  });
+  
+  const url = `https://platform.com/oauth/authorize?${params.toString()}`;
+  
+  return {
+    url,              // OAuth authorization URL
+    codeVerifier,     // PKCE code verifier (optional)
+    state,            // State parameter for validation
+  };
+}
+```
+
+**Key Components:**
+- `state`: Random string to prevent CSRF attacks
+- `codeVerifier`: For PKCE (Proof Key for Code Exchange) - adds security
+- `redirect_uri`: Where user returns after authorization
+- `scope`: Permissions requested from the platform
+
+### 2. Handle OAuth Callback
+
+The frontend receives the callback and sends code to backend:
+
+```typescript Frontend: integrations/social/platform/page.tsx
+'use client';
+
+import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch.tsx';
+
+export default function PlatformCallback() {
+  const searchParams = useSearchParams();
+  const fetch = useFetch();
+  
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    
+    if (code && state) {
+      // Send to backend to complete OAuth
+      fetch('/api/integrations/platform/callback', {
+        method: 'POST',
+        body: JSON.stringify({ code, state }),
+      }).then(() => {
+        window.close(); // Close OAuth popup
+      });
+    }
+  }, [searchParams]);
+  
+  return <div>Connecting...</div>;
+}
+```
+
+### 3. Exchange Code for Token
+
+The `authenticate()` method exchanges the code:
+
+```typescript
+async authenticate(params: {
+  code: string;
+  codeVerifier: string;
+  refresh?: string;
+}) {
+  // Exchange authorization code for access token
+  const tokenResponse = await fetch('https://platform.com/oauth/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: params.code,
+      redirect_uri: `${process.env.FRONTEND_URL}/integrations/social/platform`,
+      client_id: process.env.PLATFORM_CLIENT_ID!,
+      client_secret: process.env.PLATFORM_CLIENT_SECRET!,
+      // PKCE (if supported)
+      ...(params.codeVerifier && { code_verifier: params.codeVerifier }),
+    }),
+  });
+  
+  if (!tokenResponse.ok) {
+    throw new Error('Failed to exchange code for token');
+  }
+  
+  const {
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_in: expiresIn,
+    scope,
+  } = await tokenResponse.json();
+  
+  // Verify scopes match what we requested
+  this.checkScopes(this.scopes, scope);
+  
+  // Fetch user profile
+  const profileResponse = await fetch('https://api.platform.com/v1/me', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  
+  const { id, name, username, picture } = await profileResponse.json();
+  
+  return {
+    id: id,                    // Platform user ID
+    name: name,                // Display name
+    accessToken,               // Access token
+    refreshToken,              // Refresh token
+    expiresIn,                 // Token lifetime in seconds
+    picture: picture || '',    // Profile picture URL
+    username: username || '',  // Username/handle
+  };
+}
+```
+
+### 4. Token Refresh
+
+Tokens expire and must be refreshed automatically:
+
+```typescript
+async refreshToken(refresh_token: string): Promise<AuthTokenDetails> {
+  const tokenResponse = await fetch('https://platform.com/oauth/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token,
+      client_id: process.env.PLATFORM_CLIENT_ID!,
+      client_secret: process.env.PLATFORM_CLIENT_SECRET!,
+    }),
+  });
+  
+  if (!tokenResponse.ok) {
+    throw new Error('Failed to refresh token');
+  }
+  
+  const {
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_in: expiresIn,
+  } = await tokenResponse.json();
+  
+  // Re-fetch user info (some platforms require this)
+  const profileResponse = await fetch('https://api.platform.com/v1/me', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  
+  const { id, name, username, picture } = await profileResponse.json();
+  
+  return {
+    id,
+    accessToken,
+    refreshToken,
+    expiresIn,
+    name,
+    picture,
+    username,
+  };
+}
+```
+
+## Scope Validation
+
+Always validate that granted scopes match requested scopes:
+
+```typescript
+// In authenticate() method
+this.checkScopes(this.scopes, scope);
+
+// The checkScopes method is inherited from SocialAbstract
+// It throws NotEnoughScopes error if validation fails
+```
+
+**Why it matters:**
+- User may decline some permissions
+- Platform may not support all requested scopes
+- Insufficient scopes will cause posting failures
+
+## Platform-Specific Variations
+
+### Twitter/X OAuth 2.0
+
+```typescript
+scopes = [] as string[];  // X doesn't use scopes in OAuth 2.0
+override maxConcurrentJob = 1;  // Strict rate limits
+
+// X uses OAuth 1.0a style with oauth_token
+async authenticate(params: { code: string }) {
+  // X-specific token exchange
+  const [accessTokenSplit, accessSecretSplit] = token.split(':');
+  const client = new TwitterApi({
+    appKey: process.env.X_API_KEY!,
+    appSecret: process.env.X_API_SECRET!,
+    accessToken: accessTokenSplit,
+    accessSecret: accessSecretSplit,
+  });
+}
+```
+
+### LinkedIn OAuth 2.0
+
+```typescript
+scopes = [
+  'openid',
+  'profile', 
+  'w_member_social',
+  'r_basicprofile',
+  'rw_organization_admin',
+  'w_organization_social',
+  'r_organization_social',
+];
+
+oneTimeToken = true;  // LinkedIn uses rotating refresh tokens
+refreshWait = true;   // Wait before refresh attempts
+```
+
+### Facebook OAuth 2.0
+
+```typescript
+scopes = [
+  'pages_show_list',
+  'pages_read_engagement',
+  'pages_manage_posts',
+  'business_management',
+];
+
+// Facebook requires app review for certain scopes
+// Long-lived tokens can last 60 days
+```
+
+### Google/YouTube OAuth 2.0
+
+```typescript
+scopes = [
+  'https://www.googleapis.com/auth/youtube.upload',
+  'https://www.googleapis.com/auth/youtube',
+  'https://www.googleapis.com/auth/userinfo.profile',
+];
+
+// Google uses full URLs for scopes
+// Refresh tokens are long-lived and don't expire
+```
+
+## PKCE (Proof Key for Code Exchange)
+
+PKCE adds security to OAuth flow:
+
+```typescript
+async generateAuthUrl() {
+  const state = makeId(6);
+  const codeVerifier = makeId(30);  // Random string
+  
+  // Generate code_challenge from code_verifier
+  const encoder = new TextEncoder();
+  const data = encoder.encode(codeVerifier);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(hash)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  
+  const params = new URLSearchParams({
+    // ... other params
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+  });
+  
+  return {
+    url: `https://platform.com/oauth/authorize?${params}`,
+    codeVerifier,  // Store this for token exchange
+    state,
+  };
+}
+
+async authenticate(params: { code: string; codeVerifier: string }) {
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code: params.code,
+    code_verifier: params.codeVerifier,  // Send verifier
+    // ...
+  });
+  
+  // Exchange for token
+}
+```
+
+## Automatic Token Refresh
+
+Postiz uses Temporal workflows to automatically refresh tokens:
+
+```typescript
+// Token refresh is scheduled when integration is created
+// Workflow runs before token expires
+// If refresh fails, integration is marked as disabled
+```
+
+**Refresh Flow:**
+1. Temporal workflow monitors token expiration
+2. Triggers refresh 1 hour before expiry
+3. Calls provider's `refreshToken()` method
+4. Updates database with new tokens
+5. Reschedules next refresh
+
+## Error Handling
+
+### Handling OAuth Errors
+
+```typescript
+override handleErrors(body: string) {
+  // Token expired or invalid
+  if (body.includes('invalid_token') || body.includes('expired_token')) {
+    return {
+      type: 'refresh-token',
+      value: 'Token expired, refreshing...',
+    };
+  }
+  
+  // Insufficient permissions
+  if (body.includes('insufficient_scope')) {
+    return {
+      type: 'bad-body',
+      value: 'Insufficient permissions. Please reconnect the integration.',
+    };
+  }
+  
+  return undefined;
+}
+```
+
+### Common OAuth Errors
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `invalid_grant` | Code already used or expired | Get new authorization code |
+| `invalid_client` | Wrong client ID/secret | Check environment variables |
+| `redirect_uri_mismatch` | Redirect URI doesn't match | Update OAuth app settings |
+| `access_denied` | User declined authorization | Ask user to try again |
+| `invalid_scope` | Unsupported scope requested | Review platform documentation |
+
+## Security Best Practices
+
+<Steps>
+  <Step title="Use state parameter">
+    Always generate and validate state to prevent CSRF attacks.
+  </Step>
+  
+  <Step title="Implement PKCE">
+    Use PKCE for additional security, especially for mobile/SPA apps.
+  </Step>
+  
+  <Step title="Validate scopes">
+    Verify granted scopes match requested scopes before proceeding.
+  </Step>
+  
+  <Step title="Secure token storage">
+    Store access and refresh tokens encrypted in database.
+  </Step>
+  
+  <Step title="Handle token expiry">
+    Implement automatic refresh before tokens expire.
+  </Step>
+  
+  <Step title="Use HTTPS">
+    Always use HTTPS for redirect URIs in production.
+  </Step>
+</Steps>
+
+## Environment Configuration
+
+```bash .env
+# Platform OAuth credentials
+PLATFORM_CLIENT_ID="your_client_id"
+PLATFORM_CLIENT_SECRET="your_client_secret"
+
+# Frontend URL for redirect
+FRONTEND_URL="https://app.postiz.com"
+
+# Backend URL
+BACKEND_URL="https://api.postiz.com"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Creating Provider" icon="code" href="/development/integrations/creating-provider">
+    Build a complete integration provider
+  </Card>
+  <Card title="Testing" icon="flask" href="/development/integrations/testing">
+    Test your OAuth implementation
+  </Card>
+</CardGroup>

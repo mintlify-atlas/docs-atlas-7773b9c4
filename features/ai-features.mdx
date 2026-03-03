@@ -1,0 +1,565 @@
+---
+title: 'AI-Powered Features'
+description: 'Leverage AI for content generation, image creation, and intelligent post optimization'
+---
+
+## Overview
+
+Postiz integrates powerful AI capabilities to streamline your content creation workflow. From generating engaging posts to creating custom images and videos, AI tools help you create better content faster.
+
+<Note>
+  AI features require an active subscription plan that includes AI credits. Check your plan details in Settings.
+</Note>
+
+## AI Content Generator
+
+Generate complete, platform-optimized posts with a single prompt using Postiz's AI agent.
+
+### How It Works
+
+<Steps>
+  <Step title="Access the Generator">
+    Click the "AI Generator" button in the calendar view or main menu.
+    
+    ```typescript
+    const GeneratorComponent = () => {
+      const modal = useModals();
+      
+      const openGenerator = () => {
+        modal.openModal({
+          title: 'AI Content Generator',
+          children: <FirstStep />
+        });
+      };
+    };
+    ```
+  </Step>
+  
+  <Step title="Describe Your Content">
+    Enter a research topic or content idea. The AI will research and create relevant content.
+    
+    ```typescript
+    interface GeneratorDto {
+      research: string;      // Your topic or idea
+      isPicture: boolean;    // Generate images
+      format: 'one_short' | 'one_long' | 'thread';
+      tone: 'personal' | 'professional' | 'casual';
+    }
+    ```
+  </Step>
+  
+  <Step title="Configure Options">
+    Choose format, tone, and whether to generate images:
+    
+    <Tabs>
+      <Tab title="Format">
+        - **One Short Post** - Single concise post
+        - **One Long Post** - Detailed single post
+        - **Thread** - Multiple connected posts
+      </Tab>
+      
+      <Tab title="Tone">
+        - **Personal** - First-person, conversational
+        - **Professional** - Business-appropriate
+        - **Casual** - Relaxed and friendly
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="AI Generation Process">
+    The AI agent works through multiple steps:
+    
+    ```typescript
+    const generateStep = async (reader) => {
+      // Steps the AI goes through:
+      switch (data.name) {
+        case 'research':
+          setShowStep('Researching your content...');
+          break;
+        case 'find-category':
+          setShowStep('Understanding the category...');
+          break;
+        case 'find-topic':
+          setShowStep('Finding the topic...');
+          break;
+        case 'find-popular-posts':
+          setShowStep('Finding popular posts to match with...');
+          break;
+        case 'generate-hook':
+          setShowStep('Generating hook...');
+          break;
+        case 'generate-content':
+          setShowStep('Generating content...');
+          break;
+        case 'generate-picture':
+          setShowStep('Generating pictures...');
+          break;
+        case 'upload-pictures':
+          setShowStep('Uploading pictures...');
+          break;
+        case 'post-time':
+          setShowStep('Finding time to post...');
+          break;
+      }
+    };
+    ```
+  </Step>
+  
+  <Step title="Review and Schedule">
+    The AI-generated content opens in the post editor where you can review, edit, and schedule.
+    
+    ```typescript
+    // Generated output structure
+    interface GeneratedContent {
+      hook: string;           // Attention-grabbing opening
+      content: Array<{
+        content: string;      // Post text
+        image?: {             // Generated image (if requested)
+          id: string;
+          path: string;
+        };
+      }>;
+      date: string;          // Optimal posting time
+    }
+    ```
+  </Step>
+</Steps>
+
+### API Endpoint
+
+```typescript
+// POST /posts/generator
+const response = await fetch('/posts/generator', {
+  method: 'POST',
+  body: JSON.stringify({
+    research: 'AI trends in social media',
+    isPicture: true,
+    format: 'one_short',
+    tone: 'professional'
+  })
+});
+
+// Streaming response
+const reader = response.body.getReader();
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  // Process each step update
+}
+```
+
+## AI Image Generation
+
+Create custom images for your posts using AI image generation.
+
+### Text-to-Image
+
+Generate images from text descriptions:
+
+```typescript
+// Component for AI image generation
+const AiImage = ({ value, onChange }) => {
+  const generateImage = async (prompt: string) => {
+    // POST /media/generate-image-with-prompt
+    const response = await fetch('/media/generate-image-with-prompt', {
+      method: 'POST',
+      body: JSON.stringify({ prompt })
+    });
+    
+    const { id, path } = await response.json();
+    onChange({ id, path });
+  };
+  
+  return (
+    <button onClick={() => generateImage(value)}>
+      Generate AI Image
+    </button>
+  );
+};
+```
+
+### Image Generation Options
+
+<Accordion title="Available AI Image Models">
+  - **DALL-E** - High-quality, detailed images
+  - **Stable Diffusion** - Fast generation, artistic styles
+  - **Custom Models** - Platform-specific trained models
+  
+  ```typescript
+  // Backend service: openai.service.ts
+  async generateImage(
+    prompt: string, 
+    org: Organization,
+    isPicturePrompt: boolean
+  ): Promise<string> {
+    // Generate using configured AI service
+    const image = await this.aiService.generate(prompt);
+    
+    // Upload to media library
+    const file = await this.storage.uploadSimple(image);
+    
+    return file;
+  }
+  ```
+</Accordion>
+
+### Credits System
+
+AI image generation consumes credits:
+
+```typescript
+// GET /copilot/credits?type=ai_images
+const { credits } = await fetch(
+  '/copilot/credits?type=ai_images'
+).json();
+
+if (credits <= 0) {
+  // Show upgrade prompt
+  toaster.show('No AI credits remaining', 'warning');
+}
+```
+
+## AI Video Generation
+
+Create AI-generated videos for your social media posts.
+
+### Video Generation Types
+
+<Tabs>
+  <Tab title="Veo3 (Google)">
+    Google's Veo3 model for high-quality video generation.
+    
+    ```typescript
+    // POST /media/generate-video
+    interface VideoDto {
+      identifier: 'veo3';
+      prompt: string;
+      duration?: number;
+      style?: string;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Image Slides">
+    Create slideshow videos from multiple images.
+    
+    ```typescript
+    interface VideoDto {
+      identifier: 'image-text-slides';
+      images: Array<{ path: string }>;
+      text?: string[];
+      duration: number;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Video Component
+
+```typescript
+const AiVideo = ({ value, onChange }) => {
+  const user = useUser();
+  
+  // Check video generation allowance
+  const { data: allowed } = useSWR(
+    'generate-video-allowed',
+    () => fetch('/media/generate-video/veo3/allowed').json()
+  );
+  
+  const generateVideo = async () => {
+    modal.openModal({
+      children: <VideoWrapper 
+        onGenerate={(video) => onChange(video)}
+      />
+    });
+  };
+  
+  if (!user?.tier?.ai) {
+    return <UpgradePrompt feature="AI Video" />;
+  }
+  
+  return (
+    <button onClick={generateVideo}>
+      Generate AI Video
+    </button>
+  );
+};
+```
+
+## AI Agent (Copilot)
+
+Interactive AI assistant for creating and managing posts.
+
+### Setting Up the Agent
+
+```typescript
+import { CopilotKit } from '@copilotkit/react-core';
+import { CopilotChat } from '@copilotkit/react-ui';
+
+const AgentChat = () => {
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_INTERNAL_URL;
+  
+  return (
+    <CopilotKit
+      runtimeUrl={backendUrl + '/copilot/agent'}
+      agent="postiz"
+      properties={{
+        integrations: selectedChannels,
+        organization: org.id
+      }}
+    >
+      <CopilotChat
+        instructions={
+          initial: 'Hello, I am your Postiz agent. ' +
+                   'I can help you create posts, schedule content, ' +
+                   'and analyze your social media performance.'
+        }
+      />
+    </CopilotKit>
+  );
+};
+```
+
+### Agent Capabilities
+
+<CardGroup cols={2}>
+  <Card title="Content Creation" icon="pen">
+    Ask the agent to create posts on any topic
+  </Card>
+  <Card title="Post Scheduling" icon="calendar">
+    Schedule posts through natural conversation
+  </Card>
+  <Card title="Research" icon="magnifying-glass">
+    Get topic research and trending content ideas
+  </Card>
+  <Card title="Analytics" icon="chart-line">
+    Ask questions about your performance metrics
+  </Card>
+</CardGroup>
+
+### Backend Agent Configuration
+
+```typescript
+// Backend: copilot.controller.ts
+@Post('/agent')
+async agent(
+  @Req() req: Request,
+  @Res() res: Response,
+  @GetOrgFromRequest() organization: Organization
+) {
+  const mastra = await this._mastraService.mastra();
+  const runtimeContext = new RuntimeContext<ChannelsContext>();
+  
+  runtimeContext.set(
+    'integrations',
+    req?.body?.variables?.properties?.integrations || []
+  );
+  runtimeContext.set('organization', JSON.stringify(organization));
+  runtimeContext.set('ui', 'true');
+  
+  const agents = MastraAgent.getLocalAgents({
+    resourceId: organization.id,
+    mastra,
+    runtimeContext
+  });
+  
+  const runtime = new CopilotRuntime({ agents });
+  
+  return copilotRuntimeNextJSAppRouterEndpoint({
+    endpoint: '/copilot/agent',
+    runtime,
+    serviceAdapter: new OpenAIAdapter({ model: 'gpt-4.1' })
+  }).handleRequest(req, res);
+}
+```
+
+### Chat History
+
+```typescript
+// GET /copilot/list - Get all chat threads
+const { threads } = await fetch('/copilot/list').json();
+
+// GET /copilot/:thread/list - Get messages in thread
+const { messages } = await fetch(
+  `/copilot/${threadId}/list`
+).json();
+```
+
+## AI Content Optimization
+
+### Automatic Hook Generation
+
+The AI generates attention-grabbing hooks for your posts:
+
+```typescript
+// Hooks are generated during the content creation process
+const generatedPost = {
+  hook: "🚀 Did you know that AI can boost your engagement by 300%?",
+  content: "Here's how artificial intelligence..."
+};
+```
+
+### Platform Optimization
+
+AI automatically optimizes content for each platform:
+
+<Accordion title="Platform-Specific Optimizations">
+  - **Character Limits** - Automatically fits content to platform limits
+  - **Hashtags** - Suggests relevant hashtags for each platform
+  - **Formatting** - Adjusts formatting for optimal readability
+  - **Media** - Recommends image/video based on platform
+  
+  ```typescript
+  const optimizeForPlatform = (content: string, platform: string) => {
+    const limits = {
+      'x': 280,
+      'linkedin': 3000,
+      'facebook': 63206,
+      'instagram': 2200
+    };
+    
+    return content.substring(0, limits[platform]);
+  };
+  ```
+</Accordion>
+
+## Media Design Tools
+
+### Polonto Editor
+
+Built-in design editor powered by Polotno:
+
+```typescript
+const openDesignModal = () => {
+  modals.openModal({
+    title: 'Design Media',
+    size: '80%',
+    children: (close) => (
+      <Polonto 
+        setMedia={changeMedia} 
+        closeModal={close}
+        width={1080}
+        height={1080}
+      />
+    )
+  });
+};
+```
+
+### HeyGen Integration
+
+Create AI avatar videos:
+
+```typescript
+// Third-party provider for AI video avatars
+const HeyGenProvider = () => {
+  const generateAvatarVideo = async (script: string) => {
+    const video = await heygenService.create({
+      script,
+      avatar: 'default',
+      voice: 'en-US'
+    });
+    
+    return video;
+  };
+};
+```
+
+## AI Feature Permissions
+
+### Checking AI Access
+
+```typescript
+const user = useUser();
+
+if (!user?.tier?.ai) {
+  // Show upgrade prompt
+  return <UpgradePrompt />;
+}
+
+// AI features are available
+return <AIFeatures />;
+```
+
+### Credit Management
+
+```typescript
+// Check available credits
+GET /copilot/credits?type=ai_images
+GET /copilot/credits?type=ai_videos
+
+interface CreditResponse {
+  credits: number;
+  used: number;
+  limit: number;
+  resetDate: string;
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Specific Prompts" icon="message">
+    Be specific in your AI prompts for better results. Include target audience, tone, and key points.
+  </Card>
+  
+  <Card title="Review Generated Content" icon="eye">
+    Always review and edit AI-generated content before publishing. Add your personal touch.
+  </Card>
+  
+  <Card title="Monitor Credits" icon="coins">
+    Keep track of your AI credit usage to avoid running out mid-campaign.
+  </Card>
+  
+  <Card title="Test Different Models" icon="flask">
+    Try different AI image models to find the best fit for your brand style.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<Tabs>
+  <Tab title="Generation Failed">
+    1. Check if you have available AI credits
+    2. Ensure your prompt is clear and appropriate
+    3. Try simplifying complex requests
+    4. Check platform API status
+  </Tab>
+  
+  <Tab title="Poor Quality Results">
+    1. Refine your prompt with more details
+    2. Try different tone or format options
+    3. Add specific keywords or topics
+    4. Provide example style references
+  </Tab>
+  
+  <Tab title="Slow Generation">
+    1. AI generation can take 30-60 seconds
+    2. Image generation is faster than video
+    3. High demand may increase wait times
+    4. Check your internet connection
+  </Tab>
+</Tabs>
+
+## API Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/posts/generator` | POST | Generate AI content |
+| `/media/generate-image` | POST | Generate AI image |
+| `/media/generate-image-with-prompt` | POST | Generate and save AI image |
+| `/media/generate-video` | POST | Generate AI video |
+| `/copilot/agent` | POST | Interact with AI agent |
+| `/copilot/credits` | GET | Check AI credits |
+| `/copilot/list` | GET | Get agent conversation history |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Post Scheduling" icon="calendar" href="/features/scheduling">
+    Schedule your AI-generated content
+  </Card>
+  <Card title="Media Library" icon="images" href="/features/media-library">
+    Manage your AI-generated media assets
+  </Card>
+</CardGroup>

@@ -1,0 +1,567 @@
+---
+title: Storage Configuration
+description: Configure local or Cloudflare R2 storage for media uploads in Postiz
+---
+
+# Storage Configuration
+
+Postiz supports two storage backends for media uploads: local filesystem storage and Cloudflare R2 (S3-compatible object storage).
+
+## Overview
+
+Choose the storage provider that best fits your deployment:
+
+| Feature | Local Storage | Cloudflare R2 |
+|---------|---------------|---------------|
+| **Cost** | Free | Pay per usage |
+| **Scalability** | Limited | Unlimited |
+| **Backup** | Manual | Automatic |
+| **CDN** | Manual setup | Built-in |
+| **Best for** | Development, small deployments | Production, large scale |
+
+<Note>
+Cloudflare R2 is **required** for production deployments to properly save social media avatars and profile images.
+</Note>
+
+## Local Storage
+
+Local storage saves uploaded files directly to the server's filesystem.
+
+### Configuration
+
+```bash .env
+STORAGE_PROVIDER="local"
+UPLOAD_DIRECTORY="/uploads"
+NEXT_PUBLIC_UPLOAD_DIRECTORY="/uploads"
+```
+
+### Docker Compose Setup
+
+The Docker Compose configuration includes a volume for local uploads:
+
+```yaml docker-compose.yaml
+postiz:
+  volumes:
+    - postiz-uploads:/uploads/
+  environment:
+    STORAGE_PROVIDER: 'local'
+    UPLOAD_DIRECTORY: '/uploads'
+    NEXT_PUBLIC_UPLOAD_DIRECTORY: '/uploads'
+
+volumes:
+  postiz-uploads:
+    external: false
+```
+
+### Accessing Uploaded Files
+
+Files are served directly from the Postiz container:
+
+```
+http://localhost:4007/uploads/filename.jpg
+```
+
+### Backup Local Uploads
+
+Regularly backup your uploads directory:
+
+```bash
+# Create backup archive
+docker run --rm \
+  -v postiz_postiz-uploads:/uploads \
+  -v $(pwd):/backup \
+  alpine tar czf /backup/uploads-$(date +%Y%m%d).tar.gz -C /uploads .
+
+# Restore from backup
+docker run --rm \
+  -v postiz_postiz-uploads:/uploads \
+  -v $(pwd):/backup \
+  alpine tar xzf /backup/uploads-20260303.tar.gz -C /uploads
+```
+
+### Local Storage Limitations
+
+<Warning>
+Local storage has several limitations:
+
+1. **Single server**: Files are tied to one container
+2. **No CDN**: No built-in content delivery network
+3. **Manual backups**: You must implement your own backup strategy
+4. **Limited scalability**: Disk space is finite
+5. **No redundancy**: Single point of failure
+
+For production deployments, use Cloudflare R2.
+</Warning>
+
+## Cloudflare R2 Storage
+
+Cloudflare R2 provides S3-compatible object storage with zero egress fees.
+
+### Why Cloudflare R2?
+
+<Info>
+**Benefits of Cloudflare R2:**
+
+- **Zero egress fees**: No charges for data transfer out
+- **S3 compatible**: Works with existing S3 tools
+- **Global CDN**: Automatically distributed worldwide
+- **Automatic backups**: Built-in redundancy
+- **Unlimited storage**: Scale infinitely
+- **Required for avatars**: Needed for social media profile images
+</Info>
+
+### Prerequisites
+
+<Steps>
+  <Step title="Create Cloudflare Account">
+    Sign up at [Cloudflare](https://dash.cloudflare.com/sign-up)
+  </Step>
+  
+  <Step title="Enable R2">
+    1. Go to R2 in your Cloudflare dashboard
+    2. Enable R2 (requires payment method, but has free tier)
+  </Step>
+  
+  <Step title="Create R2 Bucket">
+    1. Click "Create bucket"
+    2. Name it (e.g., `postiz-uploads`)
+    3. Choose location (closest to your users)
+  </Step>
+  
+  <Step title="Generate API Token">
+    1. Go to R2 > Manage R2 API Tokens
+    2. Create API token
+    3. Set permissions: `Object Read & Write`
+    4. Save Access Key ID and Secret Access Key
+  </Step>
+</Steps>
+
+### Configuration
+
+```bash .env
+# Set storage provider to Cloudflare
+STORAGE_PROVIDER="cloudflare"
+
+# Cloudflare Account ID (from R2 dashboard)
+CLOUDFLARE_ACCOUNT_ID="your-account-id"
+
+# R2 API Credentials
+CLOUDFLARE_ACCESS_KEY="your-access-key-id"
+CLOUDFLARE_SECRET_ACCESS_KEY="your-secret-access-key"
+
+# Bucket Configuration
+CLOUDFLARE_BUCKETNAME="postiz-uploads"
+CLOUDFLARE_BUCKET_URL="https://your-bucket-url.r2.cloudflarestorage.com/"
+
+# Region (usually 'auto')
+CLOUDFLARE_REGION="auto"
+```
+
+### Finding Your Configuration Values
+
+#### Account ID
+
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/)
+2. Select R2
+3. Your Account ID is displayed on the right sidebar
+
+```
+Account ID: 1a2b3c4d5e6f7g8h9i0j
+```
+
+#### Access Keys
+
+1. Go to R2 > Manage R2 API Tokens
+2. Create API token
+3. Copy the Access Key ID and Secret Access Key
+
+```
+Access Key ID: 9a8b7c6d5e4f3g2h1i0j
+Secret Access Key: k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6
+```
+
+<Warning>
+Save the Secret Access Key immediately - you won't be able to see it again!
+</Warning>
+
+#### Bucket Name
+
+The name you chose when creating the bucket:
+
+```
+postiz-uploads
+```
+
+#### Bucket URL
+
+1. Go to your bucket in R2
+2. Click on Settings
+3. Find the "Public R2.dev subdomain" or custom domain
+
+```
+https://pub-1a2b3c4d5e6f7g8h.r2.dev/
+```
+
+Or use your custom domain:
+
+```
+https://cdn.yourdomain.com/
+```
+
+### Docker Compose Configuration
+
+```yaml docker-compose.yaml
+postiz:
+  environment:
+    # Storage Settings
+    STORAGE_PROVIDER: 'cloudflare'
+    
+    # Cloudflare R2 Settings
+    CLOUDFLARE_ACCOUNT_ID: 'your-account-id'
+    CLOUDFLARE_ACCESS_KEY: 'your-access-key'
+    CLOUDFLARE_SECRET_ACCESS_KEY: 'your-secret-access-key'
+    CLOUDFLARE_BUCKETNAME: 'postiz-uploads'
+    CLOUDFLARE_BUCKET_URL: 'https://your-bucket-url.r2.cloudflarestorage.com/'
+    CLOUDFLARE_REGION: 'auto'
+```
+
+### Bucket Permissions
+
+Ensure your API token has the correct permissions:
+
+```json
+{
+  "effect": "allow",
+  "actions": [
+    "storage:object:read",
+    "storage:object:write",
+    "storage:object:delete"
+  ],
+  "resources": [
+    "bucket:postiz-uploads"
+  ]
+}
+```
+
+### Public Access Configuration
+
+<Steps>
+  <Step title="Enable Public Access">
+    1. Go to your R2 bucket settings
+    2. Enable "Public Access"
+    3. Choose "Allow" for R2.dev subdomain
+  </Step>
+  
+  <Step title="Configure CORS (Optional)">
+    If you need direct browser uploads:
+    
+    ```json
+    [
+      {
+        "AllowedOrigins": ["https://postiz.yourdomain.com"],
+        "AllowedMethods": ["GET", "PUT", "POST", "DELETE"],
+        "AllowedHeaders": ["*"],
+        "ExposeHeaders": ["ETag"],
+        "MaxAgeSeconds": 3000
+      }
+    ]
+    ```
+  </Step>
+</Steps>
+
+### Custom Domain for R2
+
+Use your own domain instead of R2.dev subdomain:
+
+<Steps>
+  <Step title="Add Custom Domain">
+    1. Go to your R2 bucket
+    2. Click "Settings" > "Custom Domains"
+    3. Click "Connect Domain"
+    4. Enter your domain (e.g., `cdn.yourdomain.com`)
+  </Step>
+  
+  <Step title="Verify Domain">
+    Cloudflare will automatically add DNS records if your domain is on Cloudflare.
+  </Step>
+  
+  <Step title="Update Configuration">
+    ```bash .env
+    CLOUDFLARE_BUCKET_URL="https://cdn.yourdomain.com/"
+    ```
+  </Step>
+</Steps>
+
+### R2 Pricing
+
+Cloudflare R2 offers generous free tier:
+
+| Resource | Free Tier | Overage Cost |
+|----------|-----------|-------------|
+| Storage | 10 GB | $0.015/GB/month |
+| Class A Operations* | 1M/month | $4.50/million |
+| Class B Operations** | 10M/month | $0.36/million |
+| Egress | Unlimited | $0 |
+
+*Class A: Writes, Lists, Deletes  
+**Class B: Reads
+
+<Tip>
+R2's zero egress fees make it significantly cheaper than AWS S3 or other providers for high-traffic sites.
+</Tip>
+
+## Switching Storage Providers
+
+### From Local to R2
+
+<Steps>
+  <Step title="Set Up R2 Bucket">
+    Follow the R2 configuration steps above.
+  </Step>
+  
+  <Step title="Migrate Existing Files">
+    Use `rclone` to copy files from local storage to R2:
+    
+    ```bash
+    # Install rclone
+    curl https://rclone.org/install.sh | sudo bash
+    
+    # Configure R2 remote
+    rclone config
+    # Choose: s3 compatible
+    # Provider: Cloudflare
+    # Enter your credentials
+    
+    # Copy files
+    rclone copy /path/to/uploads r2:postiz-uploads
+    ```
+  </Step>
+  
+  <Step title="Update Environment Variables">
+    ```bash .env
+    STORAGE_PROVIDER="cloudflare"
+    # Add R2 credentials...
+    ```
+  </Step>
+  
+  <Step title="Restart Postiz">
+    ```bash
+    docker compose down
+    docker compose up -d
+    ```
+  </Step>
+</Steps>
+
+### From R2 to Local
+
+<Warning>
+Moving from R2 to local storage is not recommended for production deployments.
+</Warning>
+
+```bash
+# Download all files from R2
+rclone copy r2:postiz-uploads /path/to/local/uploads
+
+# Update environment
+STORAGE_PROVIDER="local"
+UPLOAD_DIRECTORY="/uploads"
+
+# Restart Postiz
+docker compose down
+docker compose up -d
+```
+
+## Storage Testing
+
+### Test Upload Functionality
+
+<Steps>
+  <Step title="Access Postiz">
+    Log in to your Postiz instance
+  </Step>
+  
+  <Step title="Upload Test Image">
+    1. Create a new post
+    2. Upload an image
+    3. Verify the image appears correctly
+  </Step>
+  
+  <Step title="Check Storage Location">
+    **Local Storage:**
+    ```bash
+    docker compose exec postiz ls -lh /uploads
+    ```
+    
+    **R2 Storage:**
+    Check your R2 bucket in the Cloudflare dashboard
+  </Step>
+</Steps>
+
+### Verify File URLs
+
+Test that uploaded files are accessible:
+
+```bash
+# Local storage
+curl -I http://localhost:4007/uploads/test-image.jpg
+
+# R2 storage
+curl -I https://your-bucket-url.r2.cloudflarestorage.com/test-image.jpg
+```
+
+Expected response:
+
+```
+HTTP/2 200
+content-type: image/jpeg
+content-length: 12345
+```
+
+## Troubleshooting
+
+### Local Storage Issues
+
+#### Permission Denied
+
+```bash
+# Fix volume permissions
+docker compose exec postiz chown -R node:node /uploads
+docker compose exec postiz chmod -R 755 /uploads
+```
+
+#### Disk Space Full
+
+```bash
+# Check volume usage
+docker system df -v
+
+# Clean up old files
+docker compose exec postiz find /uploads -type f -mtime +90 -delete
+```
+
+### R2 Storage Issues
+
+#### Access Denied
+
+<Warning>
+Common causes:
+
+1. **Invalid credentials**: Double-check Access Key and Secret
+2. **Insufficient permissions**: Ensure API token has read/write access
+3. **Wrong bucket name**: Verify bucket name matches exactly
+4. **IP allowlist**: Check if your server's IP is allowed
+</Warning>
+
+```bash
+# Test R2 connection
+docker compose exec postiz node -e '
+const { S3Client, ListBucketsCommand } = require("@aws-sdk/client-s3");
+const client = new S3Client({
+  region: "auto",
+  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.CLOUDFLARE_ACCESS_KEY,
+    secretAccessKey: process.env.CLOUDFLARE_SECRET_ACCESS_KEY,
+  },
+});
+client.send(new ListBucketsCommand({})).then(console.log).catch(console.error);
+'
+```
+
+#### Upload Fails
+
+```bash
+# Check Postiz logs
+docker compose logs postiz | grep -i "upload\|storage\|r2"
+```
+
+#### Wrong Bucket URL
+
+Ensure the bucket URL ends with a `/`:
+
+```bash
+# Correct
+CLOUDFLARE_BUCKET_URL="https://pub-abc123.r2.dev/"
+
+# Incorrect
+CLOUDFLARE_BUCKET_URL="https://pub-abc123.r2.dev"
+```
+
+## Advanced Configuration
+
+### Content Delivery Network (CDN)
+
+For R2, Cloudflare CDN is built-in. For local storage, use nginx:
+
+```nginx nginx.conf
+location /uploads/ {
+    alias /var/www/postiz/uploads/;
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+    add_header Access-Control-Allow-Origin "*";
+}
+```
+
+### Image Optimization
+
+Enable Cloudflare Image Resizing for R2:
+
+1. Enable Cloudflare Images
+2. Configure image transformations
+3. Use resized URLs:
+
+```
+https://your-bucket-url.r2.dev/cdn-cgi/image/width=800/image.jpg
+```
+
+### Storage Lifecycle Policies
+
+Automate cleanup of old files in R2:
+
+1. Go to R2 bucket settings
+2. Create lifecycle rule
+3. Delete objects older than X days
+
+```json
+{
+  "id": "delete-old-uploads",
+  "status": "Enabled",
+  "filter": {
+    "prefix": "temp/"
+  },
+  "expiration": {
+    "days": 30
+  }
+}
+```
+
+## Best Practices
+
+<Tip>
+**Storage Best Practices:**
+
+1. **Use R2 for production** - More reliable and scalable
+2. **Enable versioning** - Protect against accidental deletions
+3. **Set up backups** - Even with R2, maintain external backups
+4. **Monitor usage** - Track storage costs and usage patterns
+5. **Implement cleanup** - Remove old/unused files regularly
+6. **Use CDN** - Serve files through a CDN for better performance
+7. **Secure access** - Use signed URLs for private files
+8. **Test recovery** - Regularly test your backup restoration process
+</Tip>
+
+## Next Steps
+
+<Steps>
+  <Step title="Configure Authentication">
+    Set up [OAuth authentication](/self-hosting/authentication) for social platforms
+  </Step>
+  
+  <Step title="Review Environment Variables">
+    Check the complete [environment variables reference](/self-hosting/environment-variables)
+  </Step>
+  
+  <Step title="Start Using Postiz">
+    Your storage is configured! Start uploading media and scheduling posts.
+  </Step>
+</Steps>

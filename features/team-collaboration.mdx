@@ -1,0 +1,551 @@
+---
+title: 'Team Collaboration'
+description: 'Manage team members, roles, permissions, and collaborative workflows for social media management'
+---
+
+## Overview
+
+Postiz provides robust team collaboration features that allow multiple team members to work together on social media management. Assign roles, manage permissions, and collaborate efficiently across your organization.
+
+## User Roles
+
+Postiz supports three distinct user roles with different permission levels:
+
+<CardGroup cols={3}>
+  <Card title="Super Admin" icon="crown">
+    Full access to all features, billing, and team management. Can perform any action.
+  </Card>
+  <Card title="Admin" icon="user-shield">
+    Manage team members, channels, and content. Cannot access billing or super admin features.
+  </Card>
+  <Card title="User" icon="user">
+    Create and schedule posts, view analytics. Limited administrative capabilities.
+  </Card>
+</CardGroup>
+
+```typescript
+enum Role {
+  SUPERADMIN = 'SUPERADMIN',
+  ADMIN = 'ADMIN',
+  USER = 'USER'
+}
+
+// Permission levels
+const getLevel = (role: Role) => {
+  switch (role) {
+    case 'SUPERADMIN': return 2;
+    case 'ADMIN': return 1;
+    case 'USER': return 0;
+  }
+};
+```
+
+## Adding Team Members
+
+<Steps>
+  <Step title="Navigate to Team Settings">
+    Go to Settings > Team Members to access the team management interface.
+    
+    ```typescript
+    // Component: teams.component.tsx
+    const TeamsComponent = () => {
+      const user = useUser();
+      const myLevel = getLevel(user.role);
+      
+      // Fetch team members
+      const { data } = useSWR('/api/teams', loadTeam);
+    };
+    ```
+  </Step>
+  
+  <Step title="Click Add Member">
+    Click the "Add another member" button to open the invitation modal.
+    
+    ```typescript
+    const addMember = () => {
+      modals.openModal({
+        title: 'Add Member',
+        children: <AddMember />
+      });
+    };
+    ```
+  </Step>
+  
+  <Step title="Configure Member Details">
+    Enter the team member's email and select their role.
+    
+    <Tabs>
+      <Tab title="Email Invitation">
+        Send an invitation link via email automatically.
+        
+        ```typescript
+        interface AddTeamMemberDto {
+          email: string;      // Member's email
+          role: 'USER' | 'ADMIN';
+          sendEmail: boolean; // Send invitation email
+        }
+        ```
+      </Tab>
+      
+      <Tab title="Copy Link">
+        Generate an invitation link to share manually.
+        
+        ```typescript
+        const { url } = await fetch('/settings/team', {
+          method: 'POST',
+          body: JSON.stringify({
+            email: '',
+            role: 'USER',
+            sendEmail: false
+          })
+        }).json();
+        
+        copy(url); // Copy to clipboard
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="Member Accepts Invitation">
+    The invited member clicks the link and is added to the organization.
+    
+    ```typescript
+    // POST /user/join-org
+    const joinOrg = async (orgToken: string) => {
+      const response = await fetch('/user/join-org', {
+        method: 'POST',
+        body: JSON.stringify({ org: orgToken })
+      });
+      
+      const { id } = await response.json();
+      // User is now part of the organization
+    };
+    ```
+  </Step>
+</Steps>
+
+## Team Member Management
+
+### Viewing Team Members
+
+```typescript
+// GET /settings/team - Fetch all team members
+interface TeamMember {
+  id: string;
+  role: 'SUPERADMIN' | 'ADMIN' | 'USER';
+  user: {
+    id: string;
+    email: string;
+  };
+  disabled: boolean;
+}
+
+const loadTeam = async (): Promise<TeamMember[]> => {
+  return (await fetch('/settings/team')).json();
+};
+```
+
+### Team Members Display
+
+```typescript
+const TeamsComponent = () => {
+  const { data: members } = useSWR('/api/teams', loadTeam);
+  
+  return (
+    <div className="flex flex-col gap-[16px]">
+      {members?.map((member) => (
+        <div key={member.user.id} className="flex items-center">
+          <div className="flex-1">
+            {member.user.email.split('@')[0]}
+          </div>
+          <div className="flex-1">
+            {member.role === 'USER' ? 'User' :
+             member.role === 'ADMIN' ? 'Admin' : 'Super Admin'}
+          </div>
+          {canRemove(member) && (
+            <button onClick={remove(member)}>
+              Remove
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+## Permission System
+
+Postiz uses a policy-based permission system to control access to features:
+
+### Permission Policies
+
+```typescript
+// Permission actions and sections
+enum AuthorizationActions {
+  Create = 'Create',
+  Read = 'Read',
+  Update = 'Update',
+  Delete = 'Delete'
+}
+
+enum Sections {
+  POSTS_PER_MONTH = 'POSTS_PER_MONTH',
+  ADMIN = 'ADMIN',
+  AI = 'AI',
+  CHANNELS = 'CHANNELS'
+}
+
+// Usage in controllers
+@Post('/')
+@CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
+async createPost(@GetOrgFromRequest() org: Organization) {
+  // Only users with create post permission can access
+}
+```
+
+### Role-Based Access Control
+
+<Accordion title="Permission Matrix">
+  | Feature | Super Admin | Admin | User |
+  |---------|------------|-------|------|
+  | Create Posts | ✅ | ✅ | ✅ |
+  | Edit Posts | ✅ | ✅ | ✅ |
+  | Delete Posts | ✅ | ✅ | Own posts only |
+  | Add Channels | ✅ | ✅ | ❌ |
+  | Remove Channels | ✅ | ✅ | ❌ |
+  | Add Team Members | ✅ | ✅ | ❌ |
+  | Remove Team Members | ✅ | ✅ | ❌ |
+  | View Analytics | ✅ | ✅ | ✅ |
+  | Billing Access | ✅ | ❌ | ❌ |
+  | API Key Access | ✅ | ✅ | ❌ |
+  | AI Features | Based on plan | Based on plan | Based on plan |
+</Accordion>
+
+## Removing Team Members
+
+Only higher-level roles can remove lower-level team members:
+
+```typescript
+const remove = (member: TeamMember) => async () => {
+  // Check permission level
+  const myLevel = getLevel(user.role);
+  const theirLevel = getLevel(member.role);
+  
+  if (myLevel <= theirLevel) {
+    toaster.show('Insufficient permissions', 'error');
+    return;
+  }
+  
+  // Confirm deletion
+  if (!await deleteDialog(
+    'Are you sure you want to remove this team member?'
+  )) {
+    return;
+  }
+  
+  // DELETE /settings/team/:userId
+  await fetch(`/settings/team/${member.user.id}`, {
+    method: 'DELETE'
+  });
+  
+  mutate(); // Refresh team list
+};
+```
+
+## Organization Management
+
+### Multiple Organizations
+
+Users can belong to multiple organizations:
+
+```typescript
+// GET /user/organizations - Get all organizations for user
+const organizations = await fetch('/user/organizations').json();
+
+interface OrganizationMember {
+  id: string;
+  name: string;
+  users: Array<{
+    role: Role;
+    disabled: boolean;
+  }>;
+}
+```
+
+### Switching Organizations
+
+```typescript
+// POST /user/change-org
+const changeOrg = async (orgId: string) => {
+  await fetch('/user/change-org', {
+    method: 'POST',
+    body: JSON.stringify({ id: orgId })
+  });
+  
+  // Cookie 'showorg' is updated
+  // Page reloads with new organization context
+};
+```
+
+## Comments and Collaboration
+
+Team members can comment on posts for collaboration:
+
+### Adding Comments
+
+```typescript
+// POST /posts/:id/comments
+const createComment = async (postId: string, comment: string) => {
+  await fetch(`/posts/${postId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ comment })
+  });
+};
+
+// Backend controller
+@Post('/:id/comments')
+async createComment(
+  @GetOrgFromRequest() org: Organization,
+  @GetUserFromRequest() user: User,
+  @Param('id') id: string,
+  @Body() body: { comment: string }
+) {
+  return this._postsService.createComment(
+    org.id, 
+    user.id, 
+    id, 
+    body.comment
+  );
+}
+```
+
+### Viewing Comments
+
+Comments are displayed in the post editor:
+
+```typescript
+interface PostComment {
+  id: string;
+  comment: string;
+  createdAt: string;
+  user: {
+    id: string;
+    email: string;
+  };
+}
+
+const CommentsComponent = ({ postId }) => {
+  const { data: comments } = useSWR(
+    `comments-${postId}`,
+    () => fetch(`/posts/${postId}/comments`).json()
+  );
+  
+  return (
+    <div className="flex flex-col gap-2">
+      {comments?.map(comment => (
+        <div key={comment.id}>
+          <strong>{comment.user.email}</strong>
+          <p>{comment.comment}</p>
+          <small>{dayjs(comment.createdAt).fromNow()}</small>
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+## API Key Management
+
+Admins and Super Admins can manage organization API keys:
+
+### Viewing API Key
+
+```typescript
+const user = useUser();
+
+if (user.role === 'SUPERADMIN' || user.role === 'ADMIN') {
+  const apiKey = user.publicApi;
+  // Display API key to authorized users
+}
+```
+
+### Rotating API Key
+
+```typescript
+// POST /user/api-key/rotate
+@Post('/api-key/rotate')
+@CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+async rotateApiKey(@GetOrgFromRequest() organization: Organization) {
+  return this._orgService.updateApiKey(organization.id);
+}
+
+// Frontend usage
+const rotateKey = async () => {
+  const { apiKey } = await fetch('/user/api-key/rotate', {
+    method: 'POST'
+  }).json();
+  
+  toaster.show('API key rotated successfully');
+  mutate(); // Refresh user data
+};
+```
+
+<Warning>
+  Rotating the API key will invalidate all existing API integrations. Make sure to update any external services using the old key.
+</Warning>
+
+## Team Notifications
+
+### Email Notifications
+
+Team members can configure email notification preferences:
+
+```typescript
+// GET /user/email-notifications
+interface EmailNotificationsDto {
+  postPublished: boolean;
+  postFailed: boolean;
+  weeklyReport: boolean;
+  newMember: boolean;
+}
+
+// POST /user/email-notifications
+const updateNotifications = async (settings: EmailNotificationsDto) => {
+  await fetch('/user/email-notifications', {
+    method: 'POST',
+    body: JSON.stringify(settings)
+  });
+};
+```
+
+### In-App Notifications
+
+```typescript
+// GET /notifications - Fetch notifications
+interface Notification {
+  id: string;
+  type: 'post_published' | 'post_failed' | 'new_member';
+  message: string;
+  read: boolean;
+  createdAt: string;
+}
+
+const NotificationBell = () => {
+  const { data: notifications } = useSWR(
+    '/notifications',
+    () => fetch('/notifications').json()
+  );
+  
+  const unread = notifications?.filter(n => !n.read).length || 0;
+  
+  return (
+    <div className="relative">
+      <BellIcon />
+      {unread > 0 && (
+        <div className="badge">{unread}</div>
+      )}
+    </div>
+  );
+};
+```
+
+## User Context
+
+The user context provides team member information throughout the app:
+
+```typescript
+const UserContext = createContext<User | null>(null);
+
+export const useUser = () => {
+  const user = useContext(UserContext);
+  return user;
+};
+
+// GET /user/self - Fetch current user with team info
+interface User {
+  id: string;
+  email: string;
+  orgId: string;
+  role: Role;
+  tier: string;
+  totalChannels: number;
+  isLifetime: boolean;
+  admin: boolean;
+  publicApi?: string;  // Only for ADMIN/SUPERADMIN
+}
+```
+
+## Audit Trail
+
+<Note>
+  Audit trail functionality is coming soon. Track all team member actions including post creation, editing, and deletion.
+</Note>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Principle of Least Privilege" icon="shield">
+    Grant users the minimum permissions needed for their role. Start with User role and elevate as needed.
+  </Card>
+  
+  <Card title="Regular Access Reviews" icon="user-check">
+    Periodically review team member access and remove inactive users.
+  </Card>
+  
+  <Card title="Use Comments" icon="comment">
+    Encourage team collaboration through post comments before publishing.
+  </Card>
+  
+  <Card title="API Key Security" icon="key">
+    Rotate API keys regularly and never share them publicly.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<Tabs>
+  <Tab title="Can't Add Members">
+    1. Verify you have ADMIN or SUPERADMIN role
+    2. Check your subscription plan's team member limit
+    3. Ensure valid email address format
+    4. Check if member already exists in organization
+  </Tab>
+  
+  <Tab title="Permission Denied">
+    1. Verify your role has required permissions
+    2. Contact your organization admin
+    3. Check if you're in the correct organization
+    4. Try logging out and back in
+  </Tab>
+  
+  <Tab title="Invitation Not Received">
+    1. Check spam/junk email folders
+    2. Use "Copy Link" option instead
+    3. Verify email address is correct
+    4. Check email service status
+  </Tab>
+</Tabs>
+
+## API Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/settings/team` | GET | Get all team members |
+| `/settings/team` | POST | Add new team member |
+| `/settings/team/:userId` | DELETE | Remove team member |
+| `/user/organizations` | GET | Get user's organizations |
+| `/user/change-org` | POST | Switch active organization |
+| `/user/api-key/rotate` | POST | Rotate organization API key |
+| `/posts/:id/comments` | POST | Add comment to post |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Post Scheduling" icon="calendar" href="/features/scheduling">
+    Start collaborating on scheduled posts
+  </Card>
+  <Card title="Analytics" icon="chart-line" href="/features/analytics">
+    View performance metrics as a team
+  </Card>
+</CardGroup>

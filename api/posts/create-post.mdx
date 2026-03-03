@@ -1,0 +1,376 @@
+---
+title: 'Create Post'
+description: 'Schedule or draft posts across multiple social media platforms'
+api: 'POST /public/v1/posts'
+---
+
+## Overview
+
+Create and schedule posts to one or more social media platforms. Supports text content, media attachments, comments/threads, and platform-specific settings.
+
+## Request
+
+<ParamField body="type" type="string" required>
+  Post type. One of:
+  - `schedule` - Schedule post for future publication
+  - `draft` - Save as draft
+  - `now` - Publish immediately
+  - `update` - Update existing post
+</ParamField>
+
+<ParamField body="date" type="string" required>
+  ISO 8601 date string for when the post should be published. Required even for drafts.
+  
+  Example: `2024-12-31T12:00:00Z`
+</ParamField>
+
+<ParamField body="shortLink" type="boolean" required>
+  Whether to use shortened links in the post content. Defaults to `true`.
+</ParamField>
+
+<ParamField body="tags" type="array">
+  Array of tag objects for categorizing posts.
+  
+  Each tag object has:
+  - `value` (string) - Tag identifier
+  - `label` (string) - Display label
+</ParamField>
+
+<ParamField body="posts" type="array" required>
+  Array of post objects, one for each integration/platform.
+  
+  <Expandable title="Post object properties">
+    <ParamField body="posts[].integration" type="object" required>
+      Integration identifier
+      - `id` (string) - Integration ID from `/integrations` endpoint
+    </ParamField>
+    
+    <ParamField body="posts[].value" type="array" required>
+      Array of content objects. First item is the main post, additional items are comments/threads.
+      
+      Each value object contains:
+      - `content` (string, required) - Post text content
+      - `image` (array) - Array of media objects
+        - `id` (string) - Unique identifier
+        - `path` (string) - Media URL from upload endpoint
+        - `alt` (string, optional) - Alt text for accessibility
+      - `delay` (number, optional) - Delay in milliseconds before posting (for comments/threads)
+    </ParamField>
+    
+    <ParamField body="posts[].settings" type="object">
+      Platform-specific settings. Structure varies by integration type. Use `/integration-settings/:id` to get the schema for each platform.
+      
+      Common settings:
+      - **Reddit**: `subreddit`, `title`, `type`, `url`
+      - **YouTube**: `title`, `type` (public/private/unlisted), `tags`
+      - **Twitter/X**: `who_can_reply_post` (everyone/followers/mentioned)
+      - **LinkedIn**: `visibility` (public/connections)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the created post group
+</ResponseField>
+
+<ResponseField name="group" type="string">
+  Group identifier linking related posts across platforms
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Post status: `scheduled`, `draft`, `published`, or `failed`
+</ResponseField>
+
+<ResponseField name="publishDate" type="string">
+  ISO 8601 timestamp when the post will be/was published
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL - Simple Post
+curl -X POST https://api.postiz.com/public/v1/posts \
+  -H "Authorization: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "schedule",
+    "date": "2024-12-31T12:00:00Z",
+    "shortLink": true,
+    "tags": [],
+    "posts": [
+      {
+        "integration": {
+          "id": "twitter-integration-id"
+        },
+        "value": [
+          {
+            "content": "Hello from Postiz API!",
+            "image": []
+          }
+        ]
+      }
+    ]
+  }'
+```
+
+```bash cURL - Post with Media
+curl -X POST https://api.postiz.com/public/v1/posts \
+  -H "Authorization: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "schedule",
+    "date": "2024-12-31T12:00:00Z",
+    "shortLink": true,
+    "tags": [],
+    "posts": [
+      {
+        "integration": {
+          "id": "twitter-integration-id"
+        },
+        "value": [
+          {
+            "content": "Check out this amazing photo!",
+            "image": [
+              {
+                "id": "abc123",
+                "path": "https://cdn.postiz.com/media/image.jpg"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }'
+```
+
+```javascript Node.js SDK
+import Postiz from '@postiz/node';
+
+const postiz = new Postiz('YOUR_API_KEY');
+
+const result = await postiz.post({
+  type: 'schedule',
+  date: '2024-12-31T12:00:00Z',
+  shortLink: true,
+  tags: [],
+  posts: [
+    {
+      integration: {
+        id: 'twitter-integration-id'
+      },
+      value: [
+        {
+          content: 'Hello from Postiz SDK!',
+          image: []
+        }
+      ]
+    }
+  ]
+});
+
+console.log('Post created:', result);
+```
+
+```bash CLI - Simple Post
+postiz posts:create \
+  -c "Hello from Postiz CLI!" \
+  -s "2024-12-31T12:00:00Z" \
+  -i "twitter-integration-id"
+```
+
+```bash CLI - Post with Media
+postiz posts:create \
+  -c "Check out these photos!" \
+  -m "https://cdn.postiz.com/img1.jpg,https://cdn.postiz.com/img2.jpg" \
+  -s "2024-12-31T12:00:00Z" \
+  -i "twitter-integration-id"
+```
+
+```bash CLI - Thread/Comments
+postiz posts:create \
+  -c "Main post content" \
+  -c "First comment" \
+  -c "Second comment" \
+  -d 5000 \
+  -s "2024-12-31T12:00:00Z" \
+  -i "twitter-integration-id"
+```
+
+</CodeGroup>
+
+## Multi-Platform Posting
+
+Post to multiple platforms simultaneously:
+
+```json
+{
+  "type": "schedule",
+  "date": "2024-12-31T12:00:00Z",
+  "shortLink": true,
+  "tags": [],
+  "posts": [
+    {
+      "integration": { "id": "twitter-id" },
+      "value": [{ "content": "Hello Twitter!", "image": [] }]
+    },
+    {
+      "integration": { "id": "linkedin-id" },
+      "value": [{ "content": "Hello LinkedIn!", "image": [] }]
+    },
+    {
+      "integration": { "id": "facebook-id" },
+      "value": [{ "content": "Hello Facebook!", "image": [] }]
+    }
+  ]
+}
+```
+
+## Platform-Specific Settings
+
+### Reddit Post
+
+```json
+{
+  "integration": { "id": "reddit-id" },
+  "value": [{ "content": "Post content", "image": [] }],
+  "settings": {
+    "subreddit": [{
+      "value": {
+        "subreddit": "programming",
+        "title": "My Post Title",
+        "type": "text",
+        "url": "",
+        "is_flair_required": false
+      }
+    }]
+  }
+}
+```
+
+### YouTube Video
+
+```json
+{
+  "integration": { "id": "youtube-id" },
+  "value": [{ 
+    "content": "Video description",
+    "image": [{
+      "id": "video1",
+      "path": "https://cdn.postiz.com/video.mp4"
+    }]
+  }],
+  "settings": {
+    "title": "My Video Title",
+    "type": "public",
+    "tags": [
+      { "value": "tech", "label": "Tech" },
+      { "value": "tutorial", "label": "Tutorial" }
+    ]
+  }
+}
+```
+
+### Twitter/X Reply Settings
+
+```json
+{
+  "integration": { "id": "twitter-id" },
+  "value": [{ "content": "Tweet content", "image": [] }],
+  "settings": {
+    "who_can_reply_post": "everyone"
+  }
+}
+```
+
+## Threads and Comments
+
+Create Twitter threads or post comments by adding multiple items to the `value` array:
+
+```json
+{
+  "integration": { "id": "twitter-id" },
+  "value": [
+    {
+      "content": "1/3 Thread starter...",
+      "image": []
+    },
+    {
+      "content": "2/3 Second tweet...",
+      "image": [],
+      "delay": 2000
+    },
+    {
+      "content": "3/3 Final tweet...",
+      "image": [],
+      "delay": 2000
+    }
+  ]
+}
+```
+
+The `delay` property (in milliseconds) controls the time between each post in the thread.
+
+## Error Responses
+
+<ResponseField name="400" type="Bad Request">
+  Validation error in request body
+  
+  ```json
+  {
+    "statusCode": 400,
+    "message": ["date must be a valid ISO 8601 date string"],
+    "error": "Bad Request"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+  Invalid or missing API key
+  
+  ```json
+  {
+    "msg": "Invalid API key"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="403" type="Forbidden">
+  Insufficient permissions or plan limits exceeded
+  
+  ```json
+  {
+    "msg": "Monthly post limit exceeded"
+  }
+  ```
+</ResponseField>
+
+## Notes
+
+<Note>
+  The `date` field is required even for draft posts. Use a future date to indicate when you plan to publish.
+</Note>
+
+<Warning>
+  Media files must be uploaded via the `/upload` endpoint before being referenced in posts. Use the returned `path` value in the `image` array.
+</Warning>
+
+<Tip>
+  To get the correct settings schema for a specific platform, use the `/integration-settings/:id` endpoint before creating posts.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="List Posts" icon="list" href="/api/posts/list-posts">
+    Retrieve your scheduled and published posts
+  </Card>
+  <Card title="Upload Media" icon="upload" href="/api/media/upload-media">
+    Upload images and videos for your posts
+  </Card>
+  <Card title="List Integrations" icon="plug" href="/api/integrations/list-integrations">
+    Get integration IDs for the posts array
+  </Card>
+</CardGroup>

@@ -1,0 +1,153 @@
+---
+title: 'Social Platforms Overview'
+description: 'Connect and schedule posts to 30+ social media platforms with Postiz'
+---
+
+Postiz supports scheduling and publishing content to over 30 social media platforms and channels. Each platform integration is designed to maximize features while respecting platform-specific requirements and limitations.
+
+## Supported Platforms
+
+### Major Social Networks
+
+<CardGroup cols={2}>
+  <Card title="X (Twitter)" icon="x-twitter" href="/platforms/x-twitter">
+    Post tweets, threads, images, and videos with advanced features like auto-repost
+  </Card>
+  
+  <Card title="Instagram" icon="instagram" href="/platforms/instagram">
+    Share photos, videos, reels, and stories to Instagram Business accounts
+  </Card>
+  
+  <Card title="Facebook" icon="facebook" href="/platforms/facebook">
+    Post to Facebook Pages with photos, videos, and links
+  </Card>
+  
+  <Card title="LinkedIn" icon="linkedin" href="/platforms/linkedin">
+    Share professional content to personal profiles and company pages
+  </Card>
+  
+  <Card title="YouTube" icon="youtube" href="/platforms/youtube">
+    Upload videos with full metadata support
+  </Card>
+  
+  <Card title="TikTok" icon="tiktok" href="/platforms/tiktok">
+    Post videos and photo carousels to TikTok
+  </Card>
+</CardGroup>
+
+### Alternative & Emerging Platforms
+
+<CardGroup cols={2}>
+  <Card title="Bluesky" icon="cloud" href="/platforms/bluesky">
+    Decentralized social network with rich text and media support
+  </Card>
+  
+  <Card title="Mastodon" icon="mastodon" href="/platforms/mastodon">
+    Federated social network with customizable instance support
+  </Card>
+  
+  <Card title="Threads" icon="threads" href="/platforms/threads">
+    Meta's text-based conversation platform
+  </Card>
+  
+  <Card title="Reddit" icon="reddit" href="/platforms/reddit">
+    Post to multiple subreddits with flair support
+  </Card>
+  
+  <Card title="Pinterest" icon="pinterest" href="/platforms/pinterest">
+    Share visual content to Pinterest boards
+  </Card>
+</CardGroup>
+
+### Communication Platforms
+
+<CardGroup cols={2}>
+  <Card title="Discord" icon="discord" href="/platforms/discord">
+    Send messages to Discord channels
+  </Card>
+  
+  <Card title="Slack" icon="slack" href="/platforms/slack">
+    Post messages and announcements to Slack channels
+  </Card>
+</CardGroup>
+
+## Platform Comparison
+
+| Platform | Text Posts | Images | Videos | Analytics | Comments/Threads |
+|----------|-----------|--------|--------|-----------|------------------|
+| X (Twitter) | ✅ 4000* | ✅ 4 max | ✅ 1 max | ✅ | ✅ |
+| Instagram | ✅ 2200 | ✅ 10 max | ✅ Reels | ✅ | ✅ |
+| Facebook | ✅ 63206 | ✅ Multiple | ✅ | ✅ | ✅ |
+| LinkedIn | ✅ 3000 | ✅ Multiple | ✅ 1 max | ❌ | ✅ |
+| YouTube | ✅ 5000 | ❌ | ✅ 1 required | ✅ | ❌ |
+| TikTok | ✅ 2000 | ✅ Multiple | ✅ 1 max | ✅ | ❌ |
+| Reddit | ✅ 10000 | ✅ 1 max | ✅ 1 max | ❌ | ✅ |
+| Bluesky | ✅ 300 | ✅ 4 max | ✅ 1 max | ❌ | ✅ |
+| Mastodon | ✅ 500 | ✅ Multiple | ✅ Multiple | ❌ | ✅ |
+| Threads | ✅ 500 | ✅ Multiple | ✅ 1 max | ✅ | ✅ |
+| Pinterest | ✅ 500 | ✅ Multiple | ✅ 1 max | ✅ | ❌ |
+| Discord | ✅ 1980 | ✅ Multiple | ✅ Multiple | ❌ | ✅ |
+| Slack | ✅ 400000 | ✅ Multiple | ❌ | ❌ | ✅ |
+
+<Note>
+  *4000 characters for X Premium users, 200 for free users
+</Note>
+
+## Authentication Methods
+
+Postiz uses secure OAuth 2.0 authentication for most platforms. Some platforms require additional setup:
+
+<AccordionGroup>
+  <Accordion title="OAuth 2.0 Platforms">
+    Most platforms (X, Facebook, Instagram, LinkedIn, YouTube, TikTok, Pinterest, Reddit, Threads) use standard OAuth 2.0 flows. Simply click "Connect" and authorize the application.
+  </Accordion>
+  
+  <Accordion title="App Password Platforms">
+    Bluesky requires an app password instead of OAuth. Generate an app password from your Bluesky settings.
+  </Accordion>
+  
+  <Accordion title="Bot Token Platforms">
+    Discord and Slack use bot tokens configured at the application level.
+  </Accordion>
+  
+  <Accordion title="Custom Instance Platforms">
+    Mastodon supports custom instance URLs for self-hosted or alternative servers.
+  </Accordion>
+</AccordionGroup>
+
+## Rate Limits & Restrictions
+
+Each platform has different rate limits and posting restrictions:
+
+<Warning>
+  **Important Rate Limits:**
+  - **X**: 300 posts per 3 hours (very strict)
+  - **Instagram**: 25 posts per day maximum
+  - **Reddit**: 1 post per second recommended
+  - **LinkedIn**: Professional posting limits apply
+  - **TikTok**: 5 pending posts maximum in inbox
+</Warning>
+
+## Getting Started
+
+<Steps>
+  <Step title="Navigate to Integrations">
+    Go to Settings → Integrations in your Postiz dashboard
+  </Step>
+  
+  <Step title="Select Platform">
+    Choose the social platform you want to connect
+  </Step>
+  
+  <Step title="Authorize Access">
+    Follow the OAuth flow or enter credentials as required
+  </Step>
+  
+  <Step title="Start Posting">
+    Create your first scheduled post from the calendar view
+  </Step>
+</Steps>
+
+## Need Help?
+
+Each platform has specific requirements and features. Click on any platform card above to view detailed integration guides, supported features, and troubleshooting tips.

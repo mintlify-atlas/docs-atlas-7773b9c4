@@ -1,0 +1,504 @@
+---
+title: Service Layer Patterns
+description: Understanding service layer implementation in Postiz
+---
+
+## Overview
+
+The service layer contains the core business logic of Postiz. Services are responsible for data transformation, business rules, and orchestrating interactions between repositories and external services.
+
+<Info>
+Most service logic lives in `libraries/nestjs-libraries/src/services/` to enable code sharing between the backend and orchestrator.
+</Info>
+
+## Service Organization
+
+```
+libraries/nestjs-libraries/src/services/
+├── email.service.ts          # Email sending
+├── stripe.service.ts         # Payment processing
+├── appsumo.service.ts        # AppSumo integration
+└── codes.service.ts          # Promotional codes
+
+apps/backend/src/services/
+└── auth/
+    ├── auth.service.ts       # Authentication logic
+    └── providers/
+        └── providers.manager.ts
+```
+
+## Basic Service Pattern
+
+### Injectable Service
+
+```typescript auth.service.ts
+import { Injectable } from '@nestjs/common';
+import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
+import { AuthService as AuthChecker } from '@gitroom/helpers/auth/auth.service';
+import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private _userService: UsersService,
+    private _organizationService: OrganizationService,
+    private _emailService: EmailService,
+  ) {}
+
+  async canRegister(provider: string) {
+    if (process.env.DISABLE_REGISTRATION !== 'true') {
+      return true;
+    }
+    return (await this._organizationService.getCount()) === 0;
+  }
+
+  async routeAuth(
+    provider: Provider,
+    body: CreateOrgUserDto | LoginUserDto,
+    ip: string,
+    userAgent: string,
+  ) {
+    // Business logic here
+    if (provider === Provider.LOCAL) {
+      const user = await this._userService.getUserByEmail(body.email);
+      
+      if (body instanceof CreateOrgUserDto) {
+        if (user) {
+          throw new Error('Email already exists');
+        }
+        
+        const create = await this._organizationService.createOrgAndUser(
+          body,
+          ip,
+          userAgent
+        );
+        
+        return { jwt: await this.jwt(create.users[0].user) };
+      }
+      
+      if (!user || !AuthChecker.comparePassword(body.password, user.password)) {
+        throw new Error('Invalid user name or password');
+      }
+      
+      return { jwt: await this.jwt(user) };
+    }
+    
+    // OAuth provider logic
+    // ...
+  }
+
+  private async jwt(user: User) {
+    // JWT generation logic
+  }
+}
+```
+
+## Service Responsibilities
+
+### Business Logic
+
+Services contain all business rules and validations:
+
+```typescript
+async createPost(dto: CreatePostDto, userId: string) {
+  // Validate business rules
+  if (dto.scheduledAt < new Date()) {
+    throw new Error('Cannot schedule post in the past');
+  }
+  
+  // Check user permissions
+  const canPost = await this._permissionsService.canUserPost(userId);
+  if (!canPost) {
+    throw new Error('User does not have permission to post');
+  }
+  
+  // Orchestrate multiple operations
+  const post = await this._postsRepository.create(dto);
+  await this._temporalService.schedulePost(post);
+  await this._analyticsService.trackPostCreated(post);
+  
+  return post;
+}
+```
+
+### Data Transformation
+
+```typescript
+async getPostWithAnalytics(postId: string) {
+  const post = await this._postsRepository.findById(postId);
+  const analytics = await this._analyticsRepository.getByPostId(postId);
+  
+  // Transform data for response
+  return {
+    id: post.id,
+    content: post.content,
+    scheduledAt: post.scheduledAt,
+    stats: {
+      views: analytics.views,
+      clicks: analytics.clicks,
+      engagement: this.calculateEngagement(analytics),
+    },
+  };
+}
+
+private calculateEngagement(analytics: Analytics): number {
+  if (analytics.views === 0) return 0;
+  return (analytics.clicks / analytics.views) * 100;
+}
+```
+
+### Orchestration
+
+Services coordinate between multiple repositories and external services:
+
+```typescript
+async publishPost(postId: string) {
+  // Get post and integrations
+  const post = await this._postsRepository.findById(postId);
+  const integrations = await this._integrationsRepository.findByIds(
+    post.integrationIds
+  );
+  
+  // Publish to each integration
+  const results = await Promise.allSettled(
+    integrations.map(integration => 
+      this._integrationManager.publish(integration, post)
+    )
+  );
+  
+  // Update post status
+  await this._postsRepository.update(postId, {
+    status: 'published',
+    publishedAt: new Date(),
+  });
+  
+  // Track analytics
+  await this._analyticsService.trackPublished(postId, results);
+  
+  return results;
+}
+```
+
+## Dependency Injection
+
+### Constructor Injection
+
+```typescript
+@Injectable()
+export class PostsService {
+  constructor(
+    private _postsRepository: PostsRepository,
+    private _usersService: UsersService,
+    private _mediaService: MediaService,
+    private _temporalService: TemporalService,
+  ) {}
+}
+```
+
+### Circular Dependencies
+
+Use `forwardRef()` when services depend on each other:
+
+```typescript
+import { Injectable, forwardRef, Inject } from '@nestjs/common';
+
+@Injectable()
+export class PostsService {
+  constructor(
+    @Inject(forwardRef(() => UsersService))
+    private _usersService: UsersService,
+  ) {}
+}
+```
+
+## Repository Pattern
+
+Services interact with data through repositories:
+
+```typescript
+@Injectable()
+export class PostsService {
+  constructor(
+    private _postsRepository: PostsRepository,
+  ) {}
+
+  async createPost(dto: CreatePostDto) {
+    // Business logic
+    const validated = this.validatePost(dto);
+    
+    // Delegate to repository
+    return this._postsRepository.create(validated);
+  }
+
+  async findByUser(userId: string) {
+    return this._postsRepository.findMany({
+      where: { userId },
+      include: { media: true },
+    });
+  }
+}
+```
+
+<Warning>
+**Important**: Never access the database directly in services. Always use repository methods.
+
+**Wrong**: `this.prisma.post.create(...)`  
+**Correct**: `this._postsRepository.create(...)`
+</Warning>
+
+## External Service Integration
+
+### Email Service Example
+
+```typescript email.service.ts
+import { Injectable } from '@nestjs/common';
+import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
+
+@Injectable()
+export class EmailService {
+  private resend?: Resend;
+  private transporter?: any;
+
+  constructor() {
+    if (process.env.EMAIL_PROVIDER === 'resend') {
+      this.resend = new Resend(process.env.RESEND_API_KEY);
+    } else {
+      this.transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+    }
+  }
+
+  hasProvider(): boolean {
+    return !!(this.resend || this.transporter);
+  }
+
+  async sendEmail(
+    to: string,
+    subject: string,
+    html: string,
+    priority: 'top' | 'normal' = 'normal'
+  ) {
+    if (this.resend) {
+      await this.resend.emails.send({
+        from: process.env.EMAIL_FROM!,
+        to,
+        subject,
+        html,
+      });
+    } else if (this.transporter) {
+      await this.transporter.sendMail({
+        from: process.env.EMAIL_FROM,
+        to,
+        subject,
+        html,
+      });
+    }
+  }
+}
+```
+
+### Stripe Service Example
+
+```typescript stripe.service.ts
+import { Injectable } from '@nestjs/common';
+import Stripe from 'stripe';
+
+@Injectable()
+export class StripeService {
+  private stripe: Stripe;
+
+  constructor() {
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: '2023-10-16',
+    });
+  }
+
+  async createCheckoutSession(
+    priceId: string,
+    customerId: string,
+    metadata: Record<string, string>
+  ) {
+    return this.stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${process.env.FRONTEND_URL}/success`,
+      cancel_url: `${process.env.FRONTEND_URL}/cancel`,
+      metadata,
+    });
+  }
+
+  async cancelSubscription(subscriptionId: string) {
+    return this.stripe.subscriptions.cancel(subscriptionId);
+  }
+}
+```
+
+## Error Handling
+
+### Custom Exceptions
+
+```typescript
+import { HttpException, HttpStatus } from '@nestjs/common';
+
+class PostNotFoundException extends HttpException {
+  constructor(postId: string) {
+    super(`Post ${postId} not found`, HttpStatus.NOT_FOUND);
+  }
+}
+
+@Injectable()
+export class PostsService {
+  async getPost(postId: string) {
+    const post = await this._postsRepository.findById(postId);
+    
+    if (!post) {
+      throw new PostNotFoundException(postId);
+    }
+    
+    return post;
+  }
+}
+```
+
+### Try-Catch Pattern
+
+```typescript
+async publishPost(postId: string) {
+  try {
+    const post = await this._postsRepository.findById(postId);
+    const result = await this._integrationManager.publish(post);
+    return result;
+  } catch (error) {
+    // Log error
+    console.error('Failed to publish post:', error);
+    
+    // Update post status
+    await this._postsRepository.update(postId, {
+      status: 'failed',
+      error: error.message,
+    });
+    
+    // Re-throw or handle
+    throw new Error(`Failed to publish post: ${error.message}`);
+  }
+}
+```
+
+## Temporal Integration
+
+Services can trigger Temporal workflows:
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { InjectClient } from 'nestjs-temporal-core';
+import { Client } from '@temporalio/client';
+
+@Injectable()
+export class PostsService {
+  constructor(
+    @InjectClient() private readonly temporalClient: Client,
+  ) {}
+
+  async schedulePost(post: Post) {
+    // Start a Temporal workflow
+    await this.temporalClient.workflow.start('publishPost', {
+      taskQueue: 'posts',
+      workflowId: `post-${post.id}`,
+      args: [post.id],
+      // Schedule for future execution
+      startTime: post.scheduledAt,
+    });
+  }
+}
+```
+
+## Testing Services
+
+### Unit Test Example
+
+```typescript auth.service.spec.ts
+import { Test, TestingModule } from '@nestjs/testing';
+import { AuthService } from './auth.service';
+import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+
+describe('AuthService', () => {
+  let service: AuthService;
+  let usersService: UsersService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        {
+          provide: UsersService,
+          useValue: {
+            getUserByEmail: jest.fn(),
+            create: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<AuthService>(AuthService);
+    usersService = module.get<UsersService>(UsersService);
+  });
+
+  it('should register a new user', async () => {
+    const dto = { email: 'test@example.com', password: 'password123' };
+    
+    jest.spyOn(usersService, 'getUserByEmail').mockResolvedValue(null);
+    jest.spyOn(usersService, 'create').mockResolvedValue({ id: '1', ...dto });
+
+    const result = await service.register(dto);
+    expect(result).toHaveProperty('jwt');
+  });
+});
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Single Responsibility">
+    Each service should have a single, well-defined responsibility.
+  </Step>
+  
+  <Step title="Use Repositories">
+    Always access data through repository methods, never directly via Prisma.
+  </Step>
+  
+  <Step title="Keep Services Pure">
+    Avoid HTTP-specific logic (req, res objects). That belongs in controllers.
+  </Step>
+  
+  <Step title="Handle Errors">
+    Use try-catch blocks and throw meaningful exceptions.
+  </Step>
+  
+  <Step title="Inject Dependencies">
+    Use constructor injection for all dependencies.
+  </Step>
+  
+  <Step title="Write Tests">
+    Services should be thoroughly unit tested.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Database Schema" icon="database" href="/development/backend/database-schema">
+    Learn about the database structure and Prisma
+  </Card>
+  <Card title="Creating Integrations" icon="plug" href="/development/integrations/creating-provider">
+    Build a new social media integration
+  </Card>
+</CardGroup>

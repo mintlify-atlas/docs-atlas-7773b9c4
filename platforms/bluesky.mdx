@@ -1,0 +1,318 @@
+---
+title: 'Bluesky Integration'
+description: 'Post to the decentralized Bluesky social network with rich text and media'
+---
+
+## Overview
+
+Postiz integrates with Bluesky (and other ATProto networks) to post text, images, and videos with rich text formatting and facets.
+
+<Warning>
+  **Two-Factor Authentication Not Supported**: Disable 2FA on your Bluesky account before connecting. Use app-specific passwords instead.
+</Warning>
+
+## Authentication
+
+Bluesky uses custom authentication with app passwords.
+
+<Steps>
+  <Step title="Generate App Password">
+    Go to Bluesky Settings → App Passwords → Create New
+  </Step>
+  
+  <Step title="Connect in Postiz">
+    Enter your Bluesky credentials:
+    - Service URL (usually `https://bsky.social`)
+    - Identifier (handle or email)
+    - App password
+  </Step>
+  
+  <Step title="Credentials Encrypted">
+    Credentials are encrypted and stored securely
+  </Step>
+</Steps>
+
+### Custom Fields
+
+<AccordionGroup>
+  <Accordion title="Service URL">
+    - Default: `https://bsky.social`
+    - Supports custom ATProto instances
+    - Must be valid HTTPS URL
+  </Accordion>
+  
+  <Accordion title="Identifier">
+    - Your Bluesky handle (e.g., `user.bsky.social`)
+    - Or email address
+    - Used for login
+  </Accordion>
+  
+  <Accordion title="Password">
+    - Use app-specific password (not main password)
+    - Minimum 3 characters
+    - Stored encrypted
+  </Accordion>
+</AccordionGroup>
+
+## Supported Features
+
+### Content Types
+
+<Tabs>
+  <Tab title="Text Posts">
+    - **Maximum**: 300 characters
+    - Rich text with facets (links, mentions)
+    - Automatic link detection
+    - Mention autocomplete
+  </Tab>
+  
+  <Tab title="Image Posts">
+    - **Maximum**: 4 images per post
+    - Automatic image compression
+    - Images resized to stay under 976KB
+    - Alt text supported
+    - Aspect ratio preserved
+  </Tab>
+  
+  <Tab title="Video Posts">
+    - **Maximum**: 1 video per post
+    - MP4 format
+    - Uploaded to Bluesky video service
+    - Processing status tracked
+    - Cannot mix video with images
+  </Tab>
+</Tabs>
+
+<Warning>
+  **Media Rules:**
+  - Maximum 1 video OR maximum 4 pictures
+  - Cannot mix images and videos
+  - Posts can be text-only without attachments
+</Warning>
+
+## Rich Text & Facets
+
+Bluesky automatically detects and creates facets for:
+
+- **URLs**: Automatically linked
+- **Mentions**: `@username.bsky.social` format
+- **Hashtags**: May be supported in future
+
+<CodeGroup>
+```typescript Rich Text Example
+const rt = new RichText({
+  text: "Check out @user.bsky.social and https://example.com"
+});
+await rt.detectFacets(agent);
+// Automatically creates link and mention facets
+```
+</CodeGroup>
+
+## Media Processing
+
+### Image Optimization
+
+Images are automatically optimized:
+
+<Steps>
+  <Step title="Fetch Image">
+    Download image from provided URL
+  </Step>
+  
+  <Step title="Check Size">
+    If over 976KB, reduce dimensions
+  </Step>
+  
+  <Step title="Resize Iteratively">
+    Reduce by 10% until under limit
+  </Step>
+  
+  <Step title="Upload">
+    Upload optimized image as blob
+  </Step>
+</Steps>
+
+<Info>
+  Images are resized while preserving aspect ratio until they fit Bluesky's size limits.
+</Info>
+
+### Video Upload
+
+Video upload is more complex:
+
+<Steps>
+  <Step title="Get Service Auth">
+    Request authentication for video service
+  </Step>
+  
+  <Step title="Upload Video">
+    Upload to `video.bsky.app` with auth token
+  </Step>
+  
+  <Step title="Monitor Job">
+    Poll job status every 30 seconds
+  </Step>
+  
+  <Step title="Get Blob Reference">
+    Receive blob reference when complete
+  </Step>
+</Steps>
+
+Video processing can take several minutes for large files.
+
+## Replies & Threads
+
+Create threaded conversations:
+
+<Steps>
+  <Step title="Main Post">
+    Create initial post
+  </Step>
+  
+  <Step title="Reply">
+    Reference parent post's URI and CID
+  </Step>
+  
+  <Step title="Thread Chain">
+    Maintains root and parent references
+  </Step>
+</Steps>
+
+<CodeGroup>
+```typescript Reply Structure
+{
+  text: "Reply text",
+  reply: {
+    root: {
+      uri: "at://did:plc:xxx/app.bsky.feed.post/xxx",
+      cid: "bafyxxx"
+    },
+    parent: {
+      uri: "at://did:plc:xxx/app.bsky.feed.post/yyy",
+      cid: "bafyyyy"
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Automation Features
+
+### Auto-Repost High-Performing Posts
+
+<CodeGroup>
+```typescript Configuration
+{
+  identifier: 'bluesky-autoRepostPost',
+  settings: {
+    likesAmount: 100,
+    runEveryMilliseconds: 21600000,  // 6 hours
+    totalRuns: 3
+  }
+}
+```
+</CodeGroup>
+
+Automatically reposts when post reaches like threshold.
+
+### Auto-Plug Posts
+
+Add promotional replies to successful posts:
+
+<CodeGroup>
+```typescript Configuration
+{
+  identifier: 'bluesky-autoPlugPost',
+  settings: {
+    likesAmount: 50,
+    post: "Your promotional message"
+  }
+}
+```
+</CodeGroup>
+
+## Mentions
+
+Search and mention users:
+
+```typescript
+GET /mention?query=username
+
+Returns:
+[
+  {
+    id: "user.bsky.social",
+    label: "User Display Name",
+    image: "https://cdn.bsky.app/avatar..."
+  }
+]
+```
+
+Mentions are formatted as `@handle`.
+
+## Rate Limits
+
+<Info>
+  **Bluesky Rate Limits:**
+  - 2 concurrent posting jobs
+  - Moderate rate limits
+  - Video processing takes time
+  - No strict daily limits
+</Info>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Character Limit">
+    Keep posts under 300 characters - concise content performs best
+  </Card>
+  
+  <Card title="Image Quality">
+    Use high-quality images - they're compressed automatically
+  </Card>
+  
+  <Card title="Video Format">
+    Vertical 9:16 videos work well for mobile viewing
+  </Card>
+  
+  <Card title="Threading">
+    Use threads for longer content to improve engagement
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Invalid Credentials">
+    If authentication fails:
+    - Verify you're using an app password (not main password)
+    - Check handle is correct (include .bsky.social)
+    - Ensure 2FA is disabled
+    - Try generating new app password
+  </Accordion>
+  
+  <Accordion title="Video Upload Failed">
+    Video upload issues:
+    - Check video is MP4 format
+    - Verify file size isn't too large
+    - Ensure video URL is accessible
+    - Processing can take several minutes
+    - Job state FAILED means encoding error
+  </Accordion>
+  
+  <Accordion title="Image Too Large">
+    If images fail:
+    - Automatic compression should handle this
+    - Check source image isn't corrupted
+    - Try reducing image dimensions manually
+    - Maximum ~976KB after compression
+  </Accordion>
+  
+  <Accordion title="Token Refresh Failed">
+    Session issues:
+    - Bluesky tokens need periodic refresh
+    - Re-login automatically attempted
+    - If refresh fails, reconnect account
+    - Check credentials are still valid
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,262 @@
+---
+title: 'YouTube Integration'
+description: 'Upload and schedule YouTube videos with full metadata support'
+---
+
+## Overview
+
+Postiz provides YouTube video upload and scheduling with comprehensive metadata support, including titles, descriptions, tags, thumbnails, and privacy settings.
+
+<Warning>
+  **YouTube requires exactly one video attachment.** Text-only posts or multiple videos are not supported.
+</Warning>
+
+## Authentication
+
+YouTube uses Google OAuth 2.0 with extensive permissions.
+
+<Steps>
+  <Step title="Connect YouTube">
+    Click "Connect YouTube" in Integrations
+  </Step>
+  
+  <Step title="Sign in with Google">
+    Authenticate with your Google account
+  </Step>
+  
+  <Step title="Grant Permissions">
+    Authorize all YouTube and YouTube Analytics permissions
+  </Step>
+  
+  <Step title="Select Channel">
+    Choose which YouTube channel to connect
+  </Step>
+</Steps>
+
+### Required Permissions
+
+- `https://www.googleapis.com/auth/userinfo.profile` - User profile
+- `https://www.googleapis.com/auth/userinfo.email` - User email
+- `https://www.googleapis.com/auth/youtube` - Full YouTube access
+- `https://www.googleapis.com/auth/youtube.force-ssl` - HTTPS access
+- `https://www.googleapis.com/auth/youtube.readonly` - Read data
+- `https://www.googleapis.com/auth/youtube.upload` - Upload videos
+- `https://www.googleapis.com/auth/youtubepartner` - Partner features
+- `https://www.googleapis.com/auth/yt-analytics.readonly` - Analytics
+
+## Supported Features
+
+### Video Upload
+
+<Tabs>
+  <Tab title="Video Metadata">
+    **Title:**
+    - Required field
+    - Keep concise for best display
+    
+    **Description:**
+    - Up to 5000 characters
+    - Supports timestamps and links
+    - First 2-3 lines appear in search
+    
+    **Tags:**
+    - Multiple tags supported
+    - Improves discoverability
+    - Max 500 characters total
+  </Tab>
+  
+  <Tab title="Privacy Settings">
+    Choose video visibility:
+    - **Public**: Anyone can watch
+    - **Unlisted**: Only people with link
+    - **Private**: Only you and selected users
+  </Tab>
+  
+  <Tab title="Audience">
+    **Made for Kids:**
+    - Required declaration
+    - `yes` or `no` value
+    - Affects ads and features
+  </Tab>
+  
+  <Tab title="Thumbnail">
+    Upload custom thumbnail:
+    - Recommended: 1280x720px
+    - Max file size: 2MB
+    - Formats: JPG, PNG
+    - **Note**: Requires verified account
+  </Tab>
+</Tabs>
+
+### Post Settings Schema
+
+<CodeGroup>
+```typescript Video Settings
+{
+  title: string,              // Video title (required)
+  type: "public" | "unlisted" | "private",
+  selfDeclaredMadeForKids: "yes" | "no",
+  tags: Array<{label: string}>,
+  thumbnail: {                // Optional, requires verified account
+    path: string             // URL to thumbnail image
+  }
+}
+```
+</CodeGroup>
+
+## Upload Process
+
+<Steps>
+  <Step title="Download Video">
+    Video is fetched from the provided URL as a stream
+  </Step>
+  
+  <Step title="Upload to YouTube">
+    Video uploaded via YouTube Data API v3 with metadata
+  </Step>
+  
+  <Step title="Set Thumbnail">
+    If provided, custom thumbnail is uploaded (requires verified account)
+  </Step>
+  
+  <Step title="Return URL">
+    YouTube video URL returned: `youtube.com/watch?v={videoId}`
+  </Step>
+</Steps>
+
+<Info>
+  Video uploads are processed in real-time with streaming upload for efficient handling of large files.
+</Info>
+
+## Channel Management
+
+Manage multiple YouTube channels:
+
+- List all channels you have access to
+- Select specific channel for posting
+- Channel name, picture, and subscriber count displayed
+- Support for brand accounts
+
+## Analytics
+
+### Channel-Level Analytics
+
+Track overall channel performance:
+
+- **Views**: Total video views
+- **Estimated Minutes Watched**: Watch time
+- **Average View Duration**: Engagement metric
+- **Average View Percentage**: Completion rate
+- **Subscribers Gained**: New subscribers
+- **Subscribers Lost**: Unsubscribes  
+- **Likes**: Total likes
+
+Data broken down by day over your selected time period.
+
+### Video-Level Analytics
+
+Detailed metrics per video:
+
+- **Views**: Total views
+- **Likes**: Like count
+- **Comments**: Comment count
+- **Favorites**: Favorite count
+
+<CodeGroup>
+```typescript Example Analytics
+{
+  "label": "Views",
+  "percentageChange": 0,
+  "data": [
+    {
+      "total": "1523",
+      "date": "2024-03-15"
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Rate Limits
+
+<Warning>
+  **YouTube Upload Quotas:**
+  - Daily upload quota limits apply
+  - Default: ~6 uploads per day
+  - Quota resets at midnight Pacific Time
+  - Max 200 concurrent jobs in Postiz
+</Warning>
+
+## Error Handling
+
+Common YouTube errors:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| invalidTitle | Title too long | Shorten video title |
+| failedPrecondition | Thumbnail too large | Reduce thumbnail size under 2MB |
+| uploadLimitExceeded | Daily quota exceeded | Wait until quota resets tomorrow |
+| youtubeSignupRequired | No YouTube channel | Create YouTube channel first |
+| youtube.thumbnail | Account not verified | Verify account or remove thumbnail |
+| Unauthorized | Token expired | Reconnect YouTube account |
+
+<Info>
+  **Thumbnail Verification**: Custom thumbnails require a verified YouTube account. New accounts must verify via phone before uploading custom thumbnails.
+</Info>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Title Optimization">
+    Front-load keywords in the first 60 characters for search and mobile
+  </Card>
+  
+  <Card title="Description Format">
+    Include timestamps, links, and full context in the first 200 characters
+  </Card>
+  
+  <Card title="Thumbnail Quality">
+    Use high-quality 1280x720 thumbnails with clear text and faces
+  </Card>
+  
+  <Card title="Tag Strategy">
+    Use 5-8 relevant tags mixing broad and specific keywords
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Upload Quota Exceeded">
+    If you hit the upload limit:
+    - YouTube allows ~6 uploads per day for new channels
+    - Quota increases with channel history and standing
+    - Resets at midnight Pacific Time
+    - Request quota increase through Google Cloud Console
+  </Accordion>
+  
+  <Accordion title="Thumbnail Upload Failed">
+    Thumbnail issues:
+    - Account must be verified (phone verification)
+    - File size must be under 2MB
+    - Use JPG or PNG format
+    - Recommended size: 1280x720px
+    - Remove thumbnail if account not verified
+  </Accordion>
+  
+  <Accordion title="Authentication Errors">
+    If authentication fails:
+    - Ensure YouTube channel exists (not just Google account)
+    - All OAuth permissions must be granted
+    - Token may have expired - reconnect
+    - Check for any Google account restrictions
+  </Accordion>
+  
+  <Accordion title="Video Processing Delayed">
+    After upload:
+    - YouTube needs time to process video (HD/4K takes longer)
+    - Video may not be immediately available
+    - Processing status shown in YouTube Studio
+    - Usually completes within 30 minutes
+  </Accordion>
+</AccordionGroup>

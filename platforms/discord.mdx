@@ -1,0 +1,256 @@
+---
+title: 'Discord Integration'
+description: 'Send messages and announcements to Discord channels with media support'
+---
+
+## Overview
+
+Postiz integrates with Discord to send messages to channels using a Discord bot, supporting text, images, videos, and threaded conversations.
+
+## Authentication
+
+Discord uses OAuth 2.0 with bot installation.
+
+<Steps>
+  <Step title="Connect Discord">
+    Click "Connect Discord" in Integrations
+  </Step>
+  
+  <Step title="Select Server">
+    Choose which Discord server to add the bot to
+  </Step>
+  
+  <Step title="Authorize Bot">
+    Grant the bot required permissions
+  </Step>
+  
+  <Step title="Select Channel">
+    Choose which channel to post to when creating content
+  </Step>
+</Steps>
+
+### Required Permissions
+
+- `identify` - Bot identity
+- `guilds` - Access to server information
+
+### Bot Permissions
+
+The bot requires these server permissions:
+- Send Messages
+- Attach Files
+- Embed Links
+- Read Message History
+- Create Public Threads
+- Send Messages in Threads
+
+<Note>
+  The bot token is configured at the application level via `DISCORD_BOT_TOKEN_ID` environment variable.
+</Note>
+
+## Supported Features
+
+### Channel Types
+
+Post to these Discord channel types:
+
+- **Text Channels** (type 0)
+- **Announcement Channels** (type 5)
+- **Forum Channels** (type 15)
+
+### Message Features
+
+<Tabs>
+  <Tab title="Text Messages">
+    - **Maximum**: 1980 characters
+    - Markdown formatting supported
+    - Discord formatting (bold, italic, code)
+    - Role and user mentions
+  </Tab>
+  
+  <Tab title="Media Attachments">
+    - Multiple images supported
+    - Multiple videos supported
+    - Files sent as attachments
+    - Each file gets a description
+  </Tab>
+  
+  <Tab title="Mentions">
+    Special mention formats:
+    - `@everyone` - Mention everyone
+    - `@here` - Mention online users
+    - `@role` - Mention role members
+    - `@user` - Mention specific user
+  </Tab>
+</Tabs>
+
+## Posting Messages
+
+### Main Posts
+
+Messages are sent using Discord's message API:
+
+<CodeGroup>
+```typescript Message Structure
+{
+  content: string,           // Message text (1980 chars max)
+  attachments: [
+    {
+      id: number,           // Attachment index
+      description: string,  // "Picture 0", "Picture 1", etc.
+      filename: string      // Original filename
+    }
+  ]
+}
+```
+</CodeGroup>
+
+Media files are fetched from URLs and uploaded as Discord attachments.
+
+### Threaded Replies
+
+Comments create threads under messages:
+
+<Steps>
+  <Step title="First Comment">
+    Creates a new thread under the original message
+  </Step>
+  
+  <Step title="Additional Comments">
+    Posted as replies within the thread
+  </Step>
+  
+  <Step title="Thread Settings">
+    - Thread name: "Thread"
+    - Auto-archive: 24 hours (1440 minutes)
+  </Step>
+</Steps>
+
+<Info>
+  Threads keep conversations organized and improve readability in busy channels.
+</Info>
+
+## Mentions System
+
+Mention users and roles in your messages:
+
+### Format
+
+```typescript
+// In message: [[[@ID]]]
+// Renders as: <@ID> (user) or <@&ID> (role)
+
+"Hello [[[@123456789]]]"  →  "Hello <@123456789>"
+"Attention [[[@&987654321]]]"  →  "Attention <@&987654321>"
+```
+
+### Special Mentions
+
+- `@here` - Notifies online users
+- `@everyone` - Notifies all users
+- `@&roleId` - Mentions role members
+- `@userId` - Mentions specific user
+
+### Mention Search
+
+Search for mentionable users and roles:
+
+```typescript
+GET /mention?query=admin
+
+Returns:
+[
+  { id: "here", label: "here" },
+  { id: "everyone", label: "everyone" },
+  { id: "&123", label: "Admin" },       // Role
+  { id: "456", label: "John Doe" }      // User
+]
+```
+
+## Channel Management
+
+List available channels:
+
+```typescript
+GET /channels
+
+Returns:
+[
+  {
+    id: "123456789",
+    name: "general"
+  },
+  {
+    id: "987654321",
+    name: "announcements"
+  }
+]
+```
+
+Only text, announcement, and forum channels are shown.
+
+## Rate Limits
+
+<Info>
+  **Discord Rate Limits:**
+  - 5 concurrent posting jobs
+  - Generous API limits for webhooks
+  - No strict message limits
+  - Bot rate limits apply
+</Info>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Channel Selection">
+    Use announcement channels for important updates
+  </Card>
+  
+  <Card title="Threading">
+    Use threads for discussions to keep channels clean
+  </Card>
+  
+  <Card title="Mentions">
+    Use @here instead of @everyone when possible to reduce notifications
+  </Card>
+  
+  <Card title="Media Size">
+    Keep file sizes reasonable - large files may fail
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Bot Not Posting">
+    If messages aren't sending:
+    - Verify bot has Send Messages permission
+    - Check bot has access to the channel
+    - Ensure bot role is high enough in hierarchy
+    - Verify `DISCORD_BOT_TOKEN_ID` is correct
+  </Accordion>
+  
+  <Accordion title="Mentions Not Working">
+    Mention issues:
+    - Use correct format: `[[[@ID]]]`
+    - Role IDs need `&` prefix: `[[[@&roleId]]]`
+    - User/role must be in the server
+    - Bot needs permission to mention
+  </Accordion>
+  
+  <Accordion title="File Upload Failed">
+    Media upload problems:
+    - Check file size (Discord has limits)
+    - Verify file URL is accessible
+    - Ensure bot has Attach Files permission
+    - Try reducing file size
+  </Accordion>
+  
+  <Accordion title="Thread Creation Failed">
+    Threading issues:
+    - Bot needs Create Public Threads permission
+    - Original message must exist
+    - Channel must support threads
+    - Forum channels have different thread rules
+  </Accordion>
+</AccordionGroup>

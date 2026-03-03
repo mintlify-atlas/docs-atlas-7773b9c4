@@ -1,0 +1,263 @@
+---
+title: 'Instagram Integration'
+description: 'Schedule Instagram posts, reels, and stories through Facebook Business accounts'
+---
+
+## Overview
+
+Postiz integrates with Instagram through the Facebook Graph API, allowing you to schedule posts, reels, stories, and carousel content to Instagram Business accounts.
+
+<Warning>
+  **Requirements:**
+  - Instagram account must be a **Business Account**
+  - Account must be connected to a **Facebook Page**
+  - Not compatible with personal Instagram accounts
+</Warning>
+
+## Authentication
+
+Instagram authentication is done through Facebook OAuth with specific Instagram permissions.
+
+<Steps>
+  <Step title="Convert to Business Account">
+    If not already done, convert your Instagram account to a Business Account in Instagram settings
+  </Step>
+  
+  <Step title="Link to Facebook Page">
+    Connect your Instagram Business account to a Facebook Page
+  </Step>
+  
+  <Step title="Connect via Postiz">
+    Click "Connect Instagram" and authorize all requested permissions
+  </Step>
+  
+  <Step title="Select Instagram Account">
+    Choose which Instagram Business account to connect from your linked pages
+  </Step>
+</Steps>
+
+### Required Permissions
+
+- `instagram_basic` - Basic profile information
+- `instagram_content_publish` - Post content
+- `instagram_manage_comments` - Manage comments
+- `instagram_manage_insights` - Access analytics
+- `pages_show_list` - List connected pages
+- `pages_read_engagement` - Read page engagement
+- `business_management` - Business account management
+
+## Supported Features
+
+### Post Types
+
+<Tabs>
+  <Tab title="Feed Posts">
+    **Single Image/Video:**
+    - Max caption: 2200 characters
+    - Image: Up to 1080px, aspect ratio 4:5 to 1.91:1
+    - Video: MP4 format, minimum 720p
+    
+    **Carousel:**
+    - Multiple images (up to 10)
+    - All images must have compatible aspect ratios
+    - Cannot mix images and videos in carousel
+  </Tab>
+  
+  <Tab title="Reels">
+    - Video only (MP4 format)
+    - Vertical format recommended (9:16)
+    - Minimum 720p resolution
+    - Optional trial reels for testing
+    - Thumbnail offset selection supported
+  </Tab>
+  
+  <Tab title="Stories">
+    - Single image or video
+    - 9:16 aspect ratio recommended
+    - Auto-disappears after 24 hours
+    - Cannot schedule carousels as stories
+  </Tab>
+</Tabs>
+
+### Media Requirements
+
+<Warning>
+  **Instagram requires at least one attachment.** Text-only posts are not supported. Stories can have only one picture or video.
+</Warning>
+
+#### Image Specifications
+- **Formats**: JPG, PNG (automatically converted)
+- **Resolution**: Max 1920x1080px, minimum 320px
+- **Aspect Ratio**: Between 4:5 and 1.91:1
+- **Size**: Under 8MB recommended
+
+#### Video Specifications
+- **Format**: MP4
+- **Resolution**: Minimum 720p
+- **Aspect Ratio**: Flexible, but 9:16 for Reels and Stories
+- **Duration**: Up to 60 seconds for feed, 90 seconds for Reels
+
+### Advanced Post Settings
+
+<AccordionGroup>
+  <Accordion title="Trial Reels">
+    Test your reel with a smaller audience before full publication:
+    ```typescript
+    {
+      is_trial_reel: true,
+      graduation_strategy: "MANUAL" // or "AUTO"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Collaborators">
+    Tag other Instagram accounts as collaborators:
+    - Not available for carousels
+    - Not available for stories
+    - Collaborators must approve the tag
+  </Accordion>
+</AccordionGroup>
+
+## Post Processing
+
+Instagram posts go through several processing stages:
+
+<Steps>
+  <Step title="Media Upload">
+    Media files are uploaded to Instagram servers
+  </Step>
+  
+  <Step title="Processing">
+    Instagram processes the media (status: IN_PROGRESS)
+  </Step>
+  
+  <Step title="Publication">
+    Once processing completes, the post is published
+  </Step>
+</Steps>
+
+<Info>
+  Processing can take 30+ seconds per media item. Postiz automatically waits for processing to complete.
+</Info>
+
+## Comments & Engagement
+
+Add comments to your Instagram posts:
+
+- Comments posted as your Instagram Business account
+- Max 2200 characters per comment
+- Posted immediately after main post publishes
+
+## Analytics
+
+Track comprehensive Instagram metrics:
+
+### Account-Level Analytics
+- **Followers**: Total follower count
+- **Reach**: Unique accounts reached
+- **Likes**: Total likes on content
+- **Views**: Video/Reel views
+- **Comments**: Comment engagement
+- **Shares**: Content shares
+- **Saves**: Content saves
+- **Replies**: Story replies
+
+### Post-Level Analytics
+- Views (for videos/reels)
+- Reach
+- Engagement
+- Saves
+- Likes
+- Comments
+- Shares
+
+## Error Handling
+
+Common Instagram errors and solutions:
+
+| Error Code | Error | Solution |
+|------------|-------|----------|
+| 2207001 | Spam detected | Change content to avoid spam filters |
+| 2207009 | Invalid aspect ratio | Resize to 4:5 - 1.91:1 range |
+| 2207042 | Daily limit reached | Max 25 posts/day - wait until tomorrow |
+| 36001 | Resolution too high | Max 1920x1080px |
+| 190 | Missing permissions | Reconnect account with all permissions |
+| 2207081 | Trial reels not supported | Account doesn't support trial reels |
+
+<Warning>
+  **Permission Errors**: If you see error 190, you need to reconnect your account and ensure all permissions are granted during the OAuth flow.
+</Warning>
+
+## Rate Limits
+
+<Info>
+  **Instagram Limits:**
+  - Maximum **25 posts per day** per account
+  - Maximum 400 concurrent jobs (generous limit)
+  - Page rate limits may apply for high-volume posting
+</Info>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Optimal Image Size">
+    Use 1080x1080px for square posts, 1080x1350px for portrait
+  </Card>
+  
+  <Card title="Hashtag Strategy">
+    Include relevant hashtags in captions (up to 30)
+  </Card>
+  
+  <Card title="Reel Performance">
+    Vertical 9:16 reels perform best in the algorithm
+  </Card>
+  
+  <Card title="Posting Schedule">
+    Best times: 11 AM - 1 PM and 7 PM - 9 PM
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Account Not Found">
+    If your Instagram account isn't showing:
+    - Verify it's a Business account
+    - Ensure it's connected to a Facebook Page
+    - Check that the connected Page is accessible
+    - Try reconnecting both Facebook and Instagram
+  </Accordion>
+  
+  <Accordion title="Media Upload Failed">
+    Common media upload issues:
+    - Check aspect ratio is within 4:5 to 1.91:1
+    - Verify resolution doesn't exceed 1920x1080
+    - Ensure file format is supported (JPG/PNG/MP4)
+    - Try re-uploading or converting the file
+  </Accordion>
+  
+  <Accordion title="Collaborator Tags Not Working">
+    Collaborator limitations:
+    - Not supported for carousel posts
+    - Not supported for story posts
+    - Other account must approve the collaboration
+    - Only works with Instagram Business accounts
+  </Accordion>
+  
+  <Accordion title="Token Expired">
+    Instagram tokens expire after 60 days:
+    - Postiz automatically refreshes tokens
+    - If refresh fails, manually reconnect
+    - Ensure Facebook permissions are still granted
+  </Accordion>
+</AccordionGroup>
+
+## Music Integration
+
+Search and add music to your Reels:
+
+```typescript
+POST /music/search?q=song+name
+```
+
+Returns available music tracks from Instagram's library.

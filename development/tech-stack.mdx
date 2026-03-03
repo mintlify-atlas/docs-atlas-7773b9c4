@@ -1,0 +1,431 @@
+---
+title: Technology Stack
+description: Comprehensive overview of technologies used in Postiz
+---
+
+## Overview
+
+Postiz is built with modern, production-ready technologies focusing on developer experience, performance, and maintainability.
+
+## Core Technologies
+
+### Node.js Runtime
+
+<Info>
+**Version**: Node.js `>=22.12.0 <23.0.0`  
+**Package Manager**: pnpm `10.6.1`
+</Info>
+
+The project requires Node.js 22.x and uses pnpm as the exclusive package manager.
+
+```json package.json
+{
+  "engines": {
+    "node": ">=22.12.0 <23.0.0"
+  },
+  "packageManager": "pnpm@10.6.1"
+}
+```
+
+## Frontend Stack
+
+### React Ecosystem
+
+| Technology | Version | Purpose |
+|------------|---------|----------|
+| **React** | 18.3.1 | UI library |
+| **Next.js** | 14.2.35 | App framework and routing |
+| **Vite** | 6.3.5 | Build tool and dev server |
+| **TypeScript** | 5.5.4 | Type safety |
+
+### State Management & Data Fetching
+
+**SWR** (`2.2.5`) - React Hooks for data fetching
+
+<Note>
+Postiz uses SWR exclusively for all data fetching. Each SWR hook must be in a separate function to comply with React hooks rules.
+</Note>
+
+**Valid SWR Usage:**
+```typescript
+// ✓ Correct - each hook is separate
+const useCommunity = () => {
+  return useSWR<CommunitiesListResponse>("communities", getCommunities);
+};
+
+const useProviders = () => {
+  return useSWR<ProvidersListResponse>("providers", getProviders);
+};
+```
+
+**Invalid SWR Usage:**
+```typescript
+// ✗ Wrong - never return multiple hooks from one function
+const useCommunity = () => {
+  return {
+    communities: () => useSWR<CommunitiesListResponse>("communities", getCommunities),
+    providers: () => useSWR<ProvidersListResponse>("providers", getProviders),
+  };
+};
+```
+
+**Custom Fetch Hook:**
+```typescript
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch.tsx';
+
+const fetch = useFetch();
+const data = await fetch('/api/endpoint');
+```
+
+### Styling
+
+**Tailwind CSS** (`3.4.17`)
+
+<Warning>
+Never install frontend components from npm. Focus on writing native components. All UI components are custom-built.
+</Warning>
+
+Key configuration files:
+- `/apps/frontend/src/app/colors.scss` - Color variables
+- `/apps/frontend/src/app/global.scss` - Global styles
+- `/apps/frontend/tailwind.config.js` - Tailwind configuration
+
+**Color System:**
+```scss
+// Custom color variables (deprecated customColor* removed)
+--color-primary
+--color-secondary
+--new-bgColor
+--new-textColor
+--new-btn-primary
+// ... and more
+```
+
+**Additional Styling Libraries:**
+- `tailwind-scrollbar` - Custom scrollbar styling
+- `tailwindcss-rtl` - RTL language support
+- `sass` (1.89.2) - SCSS preprocessing
+
+### Form Management
+
+- **React Hook Form** (7.58.1) - Form state management
+- **@hookform/resolvers** (3.3.4) - Validation resolvers
+- **Yup** (1.4.0) - Schema validation
+- **Zod** (3.25.76) - Alternative schema validation
+
+### UI Components & Libraries
+
+| Library | Purpose |
+|---------|----------|
+| **@mantine/core** (5.10.5) | Component primitives |
+| **@mantine/dates** | Date pickers |
+| **@mantine/modals** | Modal management |
+| **emoji-picker-react** | Emoji selection |
+| **react-dropzone** | File uploads |
+| **react-tooltip** | Tooltips |
+| **sweetalert2** | Alert dialogs |
+| **@uiw/react-md-editor** | Markdown editor |
+| **@tiptap/react** | Rich text editor |
+
+### File Upload
+
+**Uppy** - File upload framework
+```typescript
+import { Dashboard } from '@uppy/dashboard';
+import { AwsS3 } from '@uppy/aws-s3';
+import { Compressor } from '@uppy/compressor';
+```
+
+### Internationalization
+
+- **i18next** (25.2.1)
+- **react-i18next** (15.5.2)
+- **i18next-browser-languagedetector** (8.1.0)
+- **i18n-iso-countries** (7.14.0)
+
+### Analytics & Monitoring
+
+- **Sentry** (`@sentry/react`, `@sentry/nextjs`) - Error tracking
+- **PostHog** (`posthog-js`) - Product analytics
+- **Plausible** (`next-plausible`) - Privacy-friendly analytics
+
+## Backend Stack
+
+### Framework
+
+**NestJS** (`10.0.2`) - Progressive Node.js framework
+
+```typescript
+import { Module, Controller, Injectable } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+```
+
+Key NestJS modules:
+- `@nestjs/core` - Core framework
+- `@nestjs/common` - Common utilities
+- `@nestjs/platform-express` - Express adapter
+- `@nestjs/swagger` (7.3.0) - API documentation
+- `@nestjs/schedule` (4.0.0) - Task scheduling
+- `@nestjs/microservices` (10.3.1) - Microservices support
+
+### Database
+
+**Prisma** (`6.5.0`) - Next-generation ORM
+
+<Info>
+Schema location: `libraries/nestjs-libraries/src/database/prisma/schema.prisma`
+</Info>
+
+```bash
+# Generate Prisma client
+pnpm prisma-generate
+
+# Push schema changes
+pnpm prisma-db-push
+
+# Pull schema from database
+pnpm prisma-db-pull
+```
+
+**PostgreSQL** - Primary database
+
+```typescript
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+```
+
+### Caching & Storage
+
+**Redis**
+- `ioredis` (5.3.2) - Redis client
+- `@nest-lab/throttler-storage-redis` - Rate limiting storage
+
+**AWS S3**
+- `@aws-sdk/client-s3` (3.787.0)
+- `@aws-sdk/s3-request-presigner` (3.787.0)
+
+### Authentication & Authorization
+
+| Library | Purpose |
+|---------|----------|
+| **jsonwebtoken** (9.0.2) | JWT generation/validation |
+| **bcrypt** (5.1.1) | Password hashing |
+| **@casl/ability** (6.5.0) | Permissions/authorization |
+| **cookie-parser** (1.4.7) | Cookie parsing |
+
+### API Clients & Integrations
+
+**Social Media:**
+- `twitter-api-v2` (1.24.0) - X/Twitter
+- `facebook-nodejs-business-sdk` (21.0.5) - Facebook
+- `@atproto/api` (0.15.15) - Bluesky
+- `@neynar/nodejs-sdk` (3.112.0) - Farcaster
+- `googleapis` (137.1.0) - Google/YouTube
+
+**Other Services:**
+- `stripe` (20.4.0) - Payment processing
+- `resend` (3.2.0) - Email service
+- `nodemailer` (7.0.11) - Email sending
+- `@dub/analytics` (0.0.32) - Link analytics
+
+### Rate Limiting
+
+**@nestjs/throttler** (6.3.0)
+
+```typescript
+ThrottlerModule.forRoot({
+  throttlers: [
+    {
+      ttl: 3600000,
+      limit: process.env.API_LIMIT ? Number(process.env.API_LIMIT) : 30,
+    },
+  ],
+  storage: new ThrottlerStorageRedisService(ioRedis),
+})
+```
+
+## Orchestrator Stack
+
+### Workflow Engine
+
+**Temporal** (`1.14.0`) - Durable execution framework
+
+```typescript
+import { proxyActivities } from '@temporalio/workflow';
+import { Worker } from '@temporalio/worker';
+import { Connection } from '@temporalio/client';
+```
+
+Temporal packages:
+- `@temporalio/workflow` - Workflow definitions
+- `@temporalio/activity` - Activity implementations
+- `@temporalio/worker` - Worker runtime
+- `@temporalio/client` - Client SDK
+- `nestjs-temporal-core` (3.2.0) - NestJS integration
+
+## AI & Agent Features
+
+### AI SDKs
+
+- **OpenAI** (6.2.0) - GPT models
+- **@ai-sdk/openai** (2.0.52) - Vercel AI SDK
+- **@langchain/openai** (0.5.5) - LangChain integration
+- **@langchain/core** (0.3.44) - LangChain core
+- **@langchain/langgraph** (0.2.63) - Graph workflows
+
+### Agent Framework
+
+**Mastra** (0.13.2)
+- `@mastra/core` (0.20.2)
+- `@mastra/memory` (0.15.6)
+- `@mastra/pg` (0.17.2)
+
+**CopilotKit** (1.10.6)
+- `@copilotkit/react-core`
+- `@copilotkit/react-textarea`
+- `@copilotkit/react-ui`
+- `@copilotkit/runtime`
+
+## Media Processing
+
+### Image Processing
+
+**Sharp** (0.33.4) - High-performance image processing
+
+```typescript
+import sharp from 'sharp';
+
+const resized = await sharp(buffer)
+  .resize(1200, 630)
+  .toBuffer();
+```
+
+**Canvas** (2.11.2) - Node.js canvas implementation
+
+### Video Processing
+
+- `music-metadata` (7.14.0) - Audio/video metadata
+- `subtitle` (4.2.2-alpha.0) - Subtitle handling
+
+### File Handling
+
+- `multer` (1.4.5-lts.1) - File upload middleware
+- `mime-types` (2.1.35) - MIME type detection
+- `transloadit` (3.0.2) - Media processing service
+- `image-to-pdf` (3.0.2) - PDF generation
+
+## Utilities & Helpers
+
+### Date & Time
+
+**dayjs** (1.11.10)
+```typescript
+import dayjs from 'dayjs';
+
+const formatted = dayjs().format('YYYY-MM-DD');
+```
+
+**timezones-list** (3.1.0) - Timezone data
+
+### Data Processing
+
+- **lodash** (4.17.21) - Utility functions
+- **axios** (1.7.7) - HTTP client
+- **fast-xml-parser** (4.5.1) - XML parsing
+- **rss-parser** (3.13.0) - RSS feed parsing
+- **simple-statistics** (7.8.3) - Statistical functions
+
+### Validation & Transformation
+
+- **class-validator** (0.14.1)
+- **class-transformer** (0.5.1)
+- **class-validator-jsonschema** (5.1.0)
+
+### Security
+
+- **crypto-hash** (3.0.0) - Cryptographic hashing
+- **sha256** (0.2.0) - SHA-256 hashing
+- **md5** (2.3.0) - MD5 hashing
+- **tweetnacl** (1.0.3) - Cryptography library
+
+## Build Tools
+
+### TypeScript
+
+**TypeScript** (5.5.4)
+- `ts-node` (10.9.2) - TypeScript execution
+- `tsup` (8.5.0) - TypeScript bundler
+- `@swc/core` (1.5.7) - Fast TypeScript compiler
+
+### Bundlers & Build Tools
+
+- **Vite** (6.3.5) - Frontend build tool
+- **@vitejs/plugin-react** (4.2.0)
+- **vite-tsconfig-paths** (5.1.4)
+
+### Testing
+
+- **Jest** (29.7.0) - Testing framework
+- `@testing-library/react` (15.0.6)
+- `jest-environment-jsdom` (29.7.0)
+- `jest-mock-extended` (4.0.0-beta1)
+- **Vitest** (3.1.4) - Alternative test runner
+
+### Code Quality
+
+**ESLint** (8.57.0)
+- `eslint-config-next` (15.2.1)
+- `eslint-config-prettier` (9.0.0)
+- `eslint-plugin-react` (7.32.2)
+- `eslint-plugin-react-hooks` (4.6.0)
+
+**Prettier** (2.6.2) - Code formatting
+
+## Development Tools
+
+- **nodemon** (3.1.9) - Auto-restart server
+- **PM2** - Process manager (production)
+- **Docker** - Containerization
+- **dotenv** (16.5.0) - Environment variables
+
+## Browser Extension
+
+- **webextension-polyfill** (0.12.0)
+- **@crxjs/vite-plugin** (2.0.0-beta.32)
+- **hot-reload-extension-vite** (1.0.13)
+
+## Additional Features
+
+### Blockchain/Web3
+
+- **@solana/wallet-adapter-react** (0.15.35)
+- **viem** (2.22.9) - Ethereum library
+- **bs58** (6.0.0) - Base58 encoding
+- **nostr-tools** (2.18.2) - Nostr protocol
+
+### Design Tools
+
+- **Polotno** (2.10.5) - Design editor
+- **Chart.js** (4.4.1) - Charts and graphs
+
+## Version Constraints
+
+<Warning>
+Critical version requirements:
+- Node.js: `>=22.12.0 <23.0.0`
+- pnpm: `10.6.1`
+- Prisma: `6.5.0`
+- Next.js: `14.2.35` (locked via pnpm override)
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Backend Development" icon="server" href="/development/backend/overview">
+    Learn backend architecture and patterns
+  </Card>
+  <Card title="Frontend Development" icon="browser" href="/development/frontend/overview">
+    Explore frontend development
+  </Card>
+</CardGroup>

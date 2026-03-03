@@ -1,0 +1,380 @@
+---
+title: 'CLI Overview'
+description: 'Command-line interface for Postiz API'
+---
+
+## Overview
+
+The Postiz CLI is a command-line tool for interacting with the Postiz API. Perform all API operations directly from your terminal without writing code.
+
+## Installation
+
+The CLI is included in the Postiz monorepo under `apps/cli`. To use it:
+
+<Steps>
+  <Step title="Clone the Repository">
+    ```bash
+    git clone https://github.com/gitroomhq/postiz-app.git
+    cd postiz-app
+    ```
+  </Step>
+  
+  <Step title="Install Dependencies">
+    ```bash
+    pnpm install
+    ```
+  </Step>
+  
+  <Step title="Build the CLI">
+    ```bash
+    pnpm --filter @postiz/cli build
+    ```
+  </Step>
+  
+  <Step title="Link Globally (Optional)">
+    ```bash
+    cd apps/cli
+    npm link
+    ```
+  </Step>
+</Steps>
+
+## Authentication
+
+Set your API key as an environment variable:
+
+```bash
+export POSTIZ_API_KEY="your_api_key_here"
+```
+
+For self-hosted instances, also set the API URL:
+
+```bash
+export POSTIZ_API_URL="https://your-domain.com"
+```
+
+### Persistent Configuration
+
+Add to your `.bashrc`, `.zshrc`, or `.profile`:
+
+```bash
+# ~/.bashrc or ~/.zshrc
+export POSTIZ_API_KEY="your_api_key_here"
+export POSTIZ_API_URL="https://api.postiz.com"  # Optional
+```
+
+## Quick Start
+
+Verify your setup by listing integrations:
+
+```bash
+postiz integrations:list
+```
+
+Create your first post:
+
+```bash
+postiz posts:create \
+  -c "Hello from Postiz CLI!" \
+  -s "2024-12-31T12:00:00Z" \
+  -i "your-integration-id"
+```
+
+## Available Commands
+
+The Postiz CLI provides commands for all major API operations:
+
+### Posts
+
+<CardGroup cols={2}>
+  <Card title="posts:create" icon="paper-plane">
+    Create and schedule posts
+  </Card>
+  <Card title="posts:list" icon="list">
+    List scheduled and published posts
+  </Card>
+  <Card title="posts:delete" icon="trash">
+    Delete a post by ID
+  </Card>
+</CardGroup>
+
+### Integrations
+
+<CardGroup cols={2}>
+  <Card title="integrations:list" icon="plug">
+    List connected social media accounts
+  </Card>
+  <Card title="integrations:settings" icon="gear">
+    Get platform-specific settings schema
+  </Card>
+  <Card title="integrations:trigger" icon="bolt">
+    Trigger integration tools for additional data
+  </Card>
+</CardGroup>
+
+### Media
+
+<Card title="upload" icon="upload">
+  Upload images, videos, and files
+</Card>
+
+## Command Structure
+
+All commands follow this pattern:
+
+```bash
+postiz <command> [positional-args] [options]
+```
+
+Example:
+
+```bash
+postiz posts:create \
+  --content "Post content" \
+  --integrations "id1,id2" \
+  --date "2024-12-31T12:00:00Z"
+```
+
+## Global Options
+
+<ParamField query="--help" type="flag">
+  Display help information for any command
+  
+  ```bash
+  postiz --help
+  postiz posts:create --help
+  ```
+</ParamField>
+
+<ParamField query="--version" type="flag">
+  Display CLI version
+  
+  ```bash
+  postiz --version
+  ```
+</ParamField>
+
+## Common Usage Patterns
+
+### Simple Post
+
+```bash
+postiz posts:create \
+  -c "Hello World!" \
+  -s "2024-12-31T12:00:00Z" \
+  -i "twitter-123"
+```
+
+### Post with Media
+
+```bash
+# Upload media first
+postiz upload ./image.jpg
+# Returns: {"id":"media-123","path":"https://cdn.postiz.com/..."}
+
+# Create post with media
+postiz posts:create \
+  -c "Check out this image!" \
+  -m "https://cdn.postiz.com/media-123.jpg" \
+  -s "2024-12-31T12:00:00Z" \
+  -i "twitter-123"
+```
+
+### Twitter Thread
+
+```bash
+postiz posts:create \
+  -c "1/3 First tweet" \
+  -c "2/3 Second tweet" \
+  -c "3/3 Final tweet" \
+  -d 2000 \
+  -s "2024-12-31T12:00:00Z" \
+  -i "twitter-123"
+```
+
+### Multi-Platform Post
+
+```bash
+postiz posts:create \
+  -c "Hello from all platforms!" \
+  -s "2024-12-31T12:00:00Z" \
+  -i "twitter-123,linkedin-456,facebook-789"
+```
+
+### List and Delete Posts
+
+```bash
+# List posts
+postiz posts:list \
+  --startDate "2024-01-01T00:00:00Z" \
+  --endDate "2024-12-31T23:59:59Z"
+
+# Delete a specific post
+postiz posts:delete post-123
+```
+
+## Complex Posts with JSON
+
+For complex posts with platform-specific settings, use a JSON file:
+
+```json
+// post.json
+{
+  "type": "schedule",
+  "date": "2024-12-31T12:00:00Z",
+  "shortLink": true,
+  "tags": [],
+  "posts": [
+    {
+      "integration": { "id": "reddit-123" },
+      "value": [
+        {
+          "content": "Interesting discussion topic",
+          "image": []
+        }
+      ],
+      "settings": {
+        "subreddit": [{
+          "value": {
+            "subreddit": "programming",
+            "title": "My Post Title",
+            "type": "text",
+            "url": "",
+            "is_flair_required": false
+          }
+        }]
+      }
+    }
+  ]
+}
+```
+
+```bash
+postiz posts:create --json ./post.json
+```
+
+## Shell Scripting
+
+Integrate the CLI into shell scripts:
+
+```bash
+#!/bin/bash
+
+# Daily post automation
+DATE=$(date -u -d "+1 day 09:00" +"%Y-%m-%dT%H:%M:%SZ")
+
+postiz posts:create \
+  -c "Good morning! Today is $(date +%A)" \
+  -s "$DATE" \
+  -i "$TWITTER_INTEGRATION_ID"
+
+if [ $? -eq 0 ]; then
+  echo "Post scheduled successfully for $DATE"
+else
+  echo "Failed to schedule post"
+  exit 1
+fi
+```
+
+## Pipeline Integration
+
+Use in CI/CD pipelines:
+
+```yaml
+# .github/workflows/post-release.yml
+name: Post Release Announcement
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+      
+      - name: Install CLI
+        run: |
+          cd apps/cli
+          npm install
+          npm link
+      
+      - name: Post to Social Media
+        env:
+          POSTIZ_API_KEY: ${{ secrets.POSTIZ_API_KEY }}
+        run: |
+          postiz posts:create \
+            -c "🚀 New release: ${{ github.event.release.tag_name }}" \
+            -s "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -i "${{ secrets.INTEGRATION_IDS }}"
+```
+
+## Output Formats
+
+The CLI outputs JSON for easy parsing:
+
+```bash
+# Pretty print with jq
+postiz integrations:list | jq '.'
+
+# Filter specific fields
+postiz integrations:list | jq '.[].id'
+
+# Count integrations
+postiz integrations:list | jq 'length'
+```
+
+## Error Handling
+
+The CLI exits with appropriate status codes:
+
+- `0` - Success
+- `1` - Error (invalid arguments, API error, etc.)
+
+```bash
+postiz posts:create -c "Test" -s "2024-12-31T12:00:00Z" -i "invalid-id"
+if [ $? -ne 0 ]; then
+  echo "Post creation failed"
+fi
+```
+
+## Configuration File
+
+The CLI reads configuration from environment variables defined in `apps/cli/src/config.ts`:
+
+```typescript
+export function getConfig(): PostizConfig {
+  const apiKey = process.env.POSTIZ_API_KEY;
+  const apiUrl = process.env.POSTIZ_API_URL;
+
+  if (!apiKey) {
+    console.error('❌ Error: POSTIZ_API_KEY environment variable is required');
+    process.exit(1);
+  }
+
+  return { apiKey, apiUrl };
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CLI Commands" icon="terminal" href="/api/cli/commands">
+    Detailed command reference
+  </Card>
+  <Card title="Node.js SDK" icon="node" href="/api/sdk/nodejs-sdk">
+    Use the programmatic SDK instead
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/overview">
+    Full API documentation
+  </Card>
+  <Card title="Node.js SDK" icon="code" href="/api/sdk/nodejs-sdk">
+    Use the JavaScript SDK
+  </Card>
+</CardGroup>

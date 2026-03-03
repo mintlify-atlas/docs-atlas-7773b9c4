@@ -1,0 +1,293 @@
+---
+title: 'Reddit Integration'
+description: 'Post to multiple subreddits with flair support and media uploads'
+---
+
+## Overview
+
+Postiz enables posting to multiple Reddit subreddits simultaneously with support for text, links, images, videos, and subreddit-specific flairs.
+
+## Authentication
+
+Reddit uses OAuth 2.0 with permanent refresh tokens.
+
+<Steps>
+  <Step title="Connect Reddit">
+    Click "Connect Reddit" in Integrations
+  </Step>
+  
+  <Step title="Authorize">
+    Grant permissions for posting and flair management
+  </Step>
+  
+  <Step title="Permanent Access">
+    Tokens don't expire (permanent duration)
+  </Step>
+</Steps>
+
+### Required Permissions
+
+- `read` - Read Reddit content
+- `identity` - Access user identity
+- `submit` - Submit posts and comments
+- `flair` - Select and manage flairs
+
+## Supported Features
+
+### Post Types
+
+<Tabs>
+  <Tab title="Text Posts">
+    - **Maximum**: 10,000 characters
+    - Markdown formatting supported
+    - Self posts to subreddit
+  </Tab>
+  
+  <Tab title="Link Posts">
+    - Share external URLs
+    - Custom title required
+    - URL validation by subreddit
+  </Tab>
+  
+  <Tab title="Image Posts">
+    - Single image per post
+    - Uploaded to Reddit's servers
+    - Automatic hosting
+  </Tab>
+  
+  <Tab title="Video Posts">
+    - Single video per post
+    - Requires video + poster image
+    - MP4 format
+    - Uploaded to Reddit v.redd.it
+  </Tab>
+</Tabs>
+
+### Multi-Subreddit Posting
+
+Post to multiple subreddits in one operation:
+
+```typescript
+{
+  subreddit: [
+    {
+      value: {
+        subreddit: "/r/programming",
+        title: "My awesome project",
+        type: "text",
+        flair: { id: "abc123", name: "Project" }
+      }
+    },
+    {
+      value: {
+        subreddit: "/r/coding",
+        title: "Check out my project",
+        type: "link",
+        url: "https://github.com/user/project"
+      }
+    }
+  ]
+}
+```
+
+<Info>
+  When posting to multiple subreddits, Postiz waits 5 seconds between submissions to respect rate limits.
+</Info>
+
+## Subreddit Tools
+
+### Search Subreddits
+
+Find subreddits to post to:
+
+```typescript
+GET /subreddits?word=programming
+
+Returns:
+[
+  {
+    title: "r/programming",
+    name: "/r/programming",
+    id: "2qh1i"
+  }
+]
+```
+
+Filters:
+- Public subreddits only
+- Active communities
+- Allows your post type (text/link/media)
+
+### Get Subreddit Restrictions
+
+Check posting requirements:
+
+```typescript
+GET /restrictions?subreddit=/r/programming
+
+Returns:
+{
+  subreddit: "/r/programming",
+  allow: ["self", "link", "media"],
+  is_flair_required: true,
+  flairs: [
+    { id: "abc123", name: "Project" },
+    { id: "def456", name: "Discussion" }
+  ]
+}
+```
+
+<Note>
+  Always check restrictions before posting to ensure compliance with subreddit rules.
+</Note>
+
+## Flair Management
+
+Many subreddits require post flairs:
+
+<Steps>
+  <Step title="Check Requirements">
+    Use `/restrictions` endpoint to see if flair is required
+  </Step>
+  
+  <Step title="Get Available Flairs">
+    List shows all flairs available for selection
+  </Step>
+  
+  <Step title="Select Flair">
+    Choose appropriate flair for your post
+  </Step>
+  
+  <Step title="Include in Post">
+    Add flair ID when submitting
+  </Step>
+</Steps>
+
+## Media Upload
+
+### Image Upload Process
+
+<Steps>
+  <Step title="Request Upload URL">
+    Get media upload credentials from Reddit
+  </Step>
+  
+  <Step title="Upload to Reddit">
+    Upload image to Reddit's S3 bucket
+  </Step>
+  
+  <Step title="Get Media URL">
+    Extract media URL from response
+  </Step>
+  
+  <Step title="Submit Post">
+    Create post with media URL
+  </Step>
+</Steps>
+
+### Video Upload Process
+
+Videos require both video and poster image:
+
+<Steps>
+  <Step title="Upload Video">
+    Upload MP4 to Reddit servers
+  </Step>
+  
+  <Step title="Upload Poster">
+    Upload thumbnail/poster image
+  </Step>
+  
+  <Step title="Create Post">
+    Submit with both URLs
+  </Step>
+</Steps>
+
+## Post Tracking
+
+Reddit uses WebSockets for real-time post status:
+
+1. Submit post returns WebSocket URL
+2. Connect to WebSocket for status updates
+3. Receive post ID and URL when published
+4. Fallback: If WebSocket fails, post still created
+
+<Info>
+  WebSocket timeout: 30 seconds. If no response, post may still be successful - check Reddit.
+</Info>
+
+## Comments
+
+Add comments to Reddit posts:
+
+- Reply to posts with `t3_{postId}` format
+- Thread comments under posts
+- Same 10,000 character limit
+- Markdown supported
+
+## Rate Limits
+
+<Warning>
+  **Critical Reddit Rate Limit:**
+  - **1 request per second** maximum
+  - MaxConcurrentJob set to 1
+  - 5-second delay between multi-subreddit posts
+  - Aggressive rate limiting by Reddit API
+</Warning>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Follow Subreddit Rules">
+    Read and follow each subreddit's specific posting rules
+  </Card>
+  
+  <Card title="Use Appropriate Flairs">
+    Select relevant flairs to improve post visibility
+  </Card>
+  
+  <Card title="Respect Rate Limits">
+    Space out posts to avoid shadowbans
+  </Card>
+  
+  <Card title="Engage with Comments">
+    Reply to comments to boost post visibility
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Post Not Appearing">
+    If post doesn't show up:
+    - Check if subreddit requires approval
+    - Verify account has enough karma
+    - Ensure account age meets minimum
+    - Check for shadowban
+    - Review subreddit's AutoModerator rules
+  </Accordion>
+  
+  <Accordion title="Flair Required Error">
+    If flair is required:
+    - Use `/restrictions` to get flair list
+    - Select appropriate flair for content
+    - Include flair_id in post submission
+    - Some subreddits don't show flairs to new users
+  </Accordion>
+  
+  <Accordion title="Media Upload Failed">
+    Media upload issues:
+    - Check file format (JPG/PNG for images, MP4 for video)
+    - Verify file size isn't too large
+    - Ensure URL is accessible
+    - Video posts need both video and poster image
+  </Accordion>
+  
+  <Accordion title="Rate Limited">
+    If you hit rate limits:
+    - Reddit limits to 1 request per second
+    - Wait 60 seconds before retrying
+    - Reduce posting frequency
+    - Spread posts across longer timeframes
+  </Accordion>
+</AccordionGroup>

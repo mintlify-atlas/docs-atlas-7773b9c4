@@ -1,0 +1,561 @@
+---
+title: 'AI Integration'
+description: 'Configure OpenAI integration for AI-powered post generation and content tools'
+---
+
+Postiz integrates with OpenAI to provide AI-powered features including post generation, image creation, thread splitting, and video content generation.
+
+## Features
+
+Postiz's AI integration enables:
+
+- **Post Generation** - Generate social media posts from content
+- **Thread Creation** - Convert long-form content into Twitter threads
+- **Image Generation** - Create images with DALL-E 3
+- **Post Splitting** - Automatically split long posts to fit platform limits
+- **Video Slides** - Generate slide presentations from text
+- **Content Extraction** - Extract article content from websites
+- **Voice Optimization** - Convert posts to natural-sounding voice scripts
+
+## Configuration
+
+### Environment Variable
+
+Add your OpenAI API key to `.env`:
+
+```bash
+OPENAI_API_KEY="sk-proj-xxxxxxxxxxxxxxxxxxxx"
+```
+
+<Info>
+  If `OPENAI_API_KEY` is not set, AI features will be disabled in the UI but Postiz will continue to function normally.
+</Info>
+
+### Get OpenAI API Key
+
+<Steps>
+
+<Step title="Create OpenAI Account">
+  1. Visit [platform.openai.com](https://platform.openai.com)
+  2. Sign up or log in to your account
+  3. Navigate to API keys section
+</Step>
+
+<Step title="Generate API Key">
+  1. Click "Create new secret key"
+  2. Name it "Postiz Production"
+  3. Copy the key (starts with `sk-proj-` or `sk-`)
+  
+  <Warning>
+    Save the key immediately - you won't be able to see it again!
+  </Warning>
+</Step>
+
+<Step title="Add Billing Information">
+  OpenAI requires billing information to use the API:
+  
+  1. Go to Settings → Billing
+  2. Add a payment method
+  3. Set usage limits to control costs
+</Step>
+
+<Step title="Configure Postiz">
+  Add to your `.env` file:
+  
+  ```bash
+  OPENAI_API_KEY="sk-proj-xxxxxxxxxxxxxxxxxxxx"
+  ```
+  
+  Restart Postiz:
+  
+  ```bash
+  docker compose restart
+  ```
+</Step>
+
+</Steps>
+
+## AI Features Implementation
+
+Postiz uses the OpenAI service (`openai.service.ts`) for various AI-powered features.
+
+### Post Generation
+
+Generate social media posts from content using GPT-4:
+
+```typescript
+// From openai.service.ts:76-133
+async generatePosts(content: string) {
+  const posts = await Promise.all([
+    // Single posts
+    openai.chat.completions.create({
+      messages: [
+        {
+          role: 'assistant',
+          content: 'Generate a Twitter post from the content without emojis'
+        },
+        { role: 'user', content: content }
+      ],
+      n: 5,
+      temperature: 1,
+      model: 'gpt-4.1',
+    }),
+    // Thread posts
+    openai.chat.completions.create({
+      messages: [
+        {
+          role: 'assistant',
+          content: 'Generate a thread for social media without emojis'
+        },
+        { role: 'user', content: content }
+      ],
+      n: 5,
+      temperature: 1,
+      model: 'gpt-4.1',
+    }),
+  ]);
+  
+  return shuffle(posts.flatMap(p => p.choices));
+}
+```
+
+**Usage**: Generate 10 post variations (5 single posts + 5 threads) from any content.
+
+### Image Generation with DALL-E 3
+
+Create images from text prompts:
+
+```typescript
+// From openai.service.ts:21-32
+async generateImage(prompt: string, isUrl: boolean, isVertical = false) {
+  const generate = await openai.images.generate({
+    prompt,
+    response_format: isUrl ? 'url' : 'b64_json',
+    model: 'dall-e-3',
+    ...(isVertical ? { size: '1024x1792' } : { size: '1024x1024' }),
+  });
+  
+  return isUrl ? generate.data[0].url : generate.data[0].b64_json;
+}
+```
+
+**Features**:
+- Standard (1024x1024) or vertical (1024x1792) formats
+- URL or base64 output
+- Enhanced prompts for better results
+
+### Enhanced Image Prompts
+
+AI optimizes your simple prompts into detailed DALL-E prompts:
+
+```typescript
+// From openai.service.ts:34-53
+async generatePromptForPicture(prompt: string) {
+  return await openai.chat.completions.parse({
+    model: 'gpt-4.1',
+    messages: [
+      {
+        role: 'system',
+        content: `You are an assistant that takes a description and style 
+                  and generates a prompt for image generation. Make it very 
+                  long and descriptive. For realistic styles, describe camera 
+                  settings, lighting, composition, etc.`
+      },
+      { role: 'user', content: `prompt: ${prompt}` }
+    ],
+    response_format: zodResponseFormat(PicturePrompt, 'picturePrompt'),
+  });
+}
+```
+
+**Example**:
+- Input: "sunset over mountains"
+- Output: "A breathtaking sunset over snow-capped mountain peaks, golden hour lighting with warm orange and pink hues, dramatic clouds, shot with wide-angle lens, f/8 aperture, professional landscape photography..."
+
+### Post Splitting for Character Limits
+
+Automatically split long posts to fit platform character limits:
+
+```typescript
+// From openai.service.ts:155-227
+async separatePosts(content: string, len: number) {
+  const posts = await openai.chat.completions.parse({
+    model: 'gpt-4.1',
+    messages: [
+      {
+        role: 'system',
+        content: `Break this post into a thread. Each post must be 
+                  minimum ${len - 10} and maximum ${len} characters, 
+                  keeping exact wording and line breaks. Split based 
+                  on context.`
+      },
+      { role: 'user', content: content }
+    ],
+    response_format: zodResponseFormat(SeparatePostsPrompt, 'separatePosts'),
+  });
+  
+  return { posts: posts.choices[0].message.parsed?.posts || [] };
+}
+```
+
+**Usage**: 
+- X (Twitter): 280 characters (4000 for premium)
+- LinkedIn: 3000 characters
+- Facebook: 63,206 characters
+
+### Video Slide Generation
+
+Create video presentation slides from text:
+
+```typescript
+// From openai.service.ts:229-270
+async generateSlidesFromText(text: string) {
+  const parse = await openai.chat.completions.parse({
+    model: 'gpt-4.1',
+    messages: [
+      {
+        role: 'system',
+        content: `Break text into 3-5 slides maximum. Each slide needs:
+                  - Image prompt (with dark gradient, no text in image)
+                  - Voice text for narration`
+      },
+      { role: 'user', content: text }
+    ],
+    response_format: zodResponseFormat(
+      z.object({
+        slides: z.array(
+          z.object({
+            imagePrompt: z.string(),
+            voiceText: z.string(),
+          })
+        )
+      }),
+      'slides'
+    ),
+  });
+  
+  return parse.choices[0].message.parsed?.slides || [];
+}
+```
+
+**Output**: Array of slides with image prompts and voice narration text.
+
+### Voice Text Optimization
+
+Convert social posts to natural-sounding voice scripts:
+
+```typescript
+// From openai.service.ts:55-74
+async generateVoiceFromText(prompt: string) {
+  return await openai.chat.completions.parse({
+    model: 'gpt-4.1',
+    messages: [
+      {
+        role: 'system',
+        content: `Convert this social media post to natural human speech.
+                  Remove hyphens, add pauses with "...", make it sound 
+                  like a real person talking.`
+      },
+      { role: 'user', content: `prompt: ${prompt}` }
+    ],
+    response_format: zodResponseFormat(VoicePrompt, 'voice'),
+  });
+}
+```
+
+**Example**:
+- Input: "Check out our new feature - it's amazing!"
+- Output: "Check out our new feature... it's amazing!"
+
+### Website Content Extraction
+
+Extract article content from websites and generate posts:
+
+```typescript
+// From openai.service.ts:134-153
+async extractWebsiteText(content: string) {
+  const websiteContent = await openai.chat.completions.create({
+    messages: [
+      {
+        role: 'assistant',
+        content: 'Extract only the article content from this website text'
+      },
+      { role: 'user', content }
+    ],
+    model: 'gpt-4.1',
+  });
+  
+  const articleContent = websiteContent.choices[0].message.content;
+  
+  // Generate posts from extracted content
+  return this.generatePosts(articleContent);
+}
+```
+
+**Usage**: Paste full website HTML, get clean article text + generated posts.
+
+## Model Selection
+
+Postiz uses GPT-4.1 for all text generation tasks:
+
+```typescript
+model: 'gpt-4.1'
+```
+
+<Note>
+  GPT-4.1 provides the best balance of quality and speed for social media content generation. Image generation uses DALL-E 3.
+</Note>
+
+## Structured Output with Zod
+
+Postiz uses OpenAI's structured output feature with Zod schemas:
+
+```typescript
+import { zodResponseFormat } from 'openai/helpers/zod';
+import { z } from 'zod';
+
+const PicturePrompt = z.object({
+  prompt: z.string(),
+});
+
+const response = await openai.chat.completions.parse({
+  model: 'gpt-4.1',
+  messages: [...],
+  response_format: zodResponseFormat(PicturePrompt, 'picturePrompt'),
+});
+```
+
+This ensures consistent, typed responses from the AI.
+
+## Cost Optimization
+
+### Pricing Considerations
+
+- **GPT-4**: ~$0.03 per 1K tokens (input) + $0.06 per 1K tokens (output)
+- **DALL-E 3**: ~$0.04 per standard image, ~$0.08 per HD image
+- **Average post generation**: ~$0.01-0.05 per request
+
+### Best Practices
+
+<Steps>
+
+<Step title="Set Usage Limits">
+  Configure OpenAI usage limits in your account:
+  
+  1. Go to Settings → Limits
+  2. Set monthly budget (e.g., $50/month)
+  3. Enable email alerts at 75% and 100%
+</Step>
+
+<Step title="Cache Results">
+  Cache generated content to avoid redundant API calls for the same input.
+</Step>
+
+<Step title="Batch Requests">
+  Postiz generates 10 variations per request (5 single + 5 threads) to maximize value.
+</Step>
+
+<Step title="Monitor Usage">
+  Check OpenAI dashboard regularly:
+  
+  - Daily usage trends
+  - Most expensive operations
+  - Failed requests
+</Step>
+
+</Steps>
+
+## Error Handling
+
+Postiz implements robust error handling with retries:
+
+```typescript
+// From openai.service.ts:230-268
+for (let i = 0; i < 3; i++) {
+  try {
+    const parse = await openai.chat.completions.parse({
+      model: 'gpt-4.1',
+      messages: [...],
+      response_format: zodResponseFormat(schema, 'name'),
+    });
+    
+    return parse;
+  } catch (err) {
+    console.log(err);
+    // Retry up to 3 times
+  }
+}
+
+return []; // Fallback to empty result
+```
+
+<Info>
+  Failed AI operations gracefully degrade - Postiz continues to function without AI features if OpenAI is unavailable.
+</Info>
+
+## Testing AI Integration
+
+<Steps>
+
+<Step title="Verify Configuration">
+  Check logs for OpenAI initialization:
+  
+  ```bash
+  docker compose logs backend | grep -i openai
+  ```
+</Step>
+
+<Step title="Test Post Generation">
+  1. Create a new post in Postiz
+  2. Click the AI generation button
+  3. Enter sample content
+  4. Verify generated posts appear
+</Step>
+
+<Step title="Test Image Generation">
+  1. Navigate to media library
+  2. Use AI image generation feature
+  3. Enter a prompt
+  4. Verify image is generated
+</Step>
+
+<Step title="Monitor Usage">
+  Check OpenAI dashboard for API calls and costs.
+</Step>
+
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="AI features not appearing in UI">
+  If AI buttons are missing:
+  
+  1. Verify `OPENAI_API_KEY` is set in `.env`
+  2. Ensure the key starts with `sk-` or `sk-proj-`
+  3. Restart frontend and backend:
+     ```bash
+     docker compose restart
+     ```
+  4. Check browser console for errors
+</Accordion>
+
+<Accordion title="API key authentication failed">
+  If you see authentication errors:
+  
+  1. **Invalid Key**: Verify the API key is correct and active
+  2. **Billing**: Ensure billing is set up in OpenAI account
+  3. **Usage Limits**: Check you haven't exceeded monthly limits
+  4. **Revoked Key**: Generate a new API key if the current one was revoked
+  
+  Test the key directly:
+  ```bash
+  curl https://api.openai.com/v1/models \
+    -H "Authorization: Bearer $OPENAI_API_KEY"
+  ```
+</Accordion>
+
+<Accordion title="Rate limit errors">
+  OpenAI has rate limits:
+  
+  - **Tier 1**: 200 requests/min, 40,000 tokens/min
+  - **Tier 2**: 500 requests/min, 80,000 tokens/min
+  - **Tier 3+**: Higher limits
+  
+  Solutions:
+  1. Implement request queuing
+  2. Upgrade your OpenAI tier
+  3. Cache results to reduce API calls
+  4. Add retry logic with exponential backoff (already implemented)
+</Accordion>
+
+<Accordion title="High costs / unexpected usage">
+  To reduce costs:
+  
+  1. **Set Hard Limits**: Configure monthly budget in OpenAI dashboard
+  2. **Monitor Usage**: Check usage daily for unexpected spikes
+  3. **Disable Features**: Disable AI features for certain users/orgs
+  4. **Cache Aggressively**: Cache generated content
+  5. **Use Cheaper Models**: Consider GPT-3.5 for non-critical features (requires code changes)
+  
+  Check current usage:
+  ```bash
+  curl https://api.openai.com/v1/usage?date=$(date +%Y-%m-%d) \
+    -H "Authorization: Bearer $OPENAI_API_KEY"
+  ```
+</Accordion>
+
+<Accordion title="Generation quality issues">
+  If AI-generated content is poor quality:
+  
+  1. **Better Prompts**: Provide more context and examples
+  2. **Temperature**: Already optimized at 1.0 for creative variety
+  3. **Model**: Using GPT-4.1 (highest quality)
+  4. **Content Length**: Provide sufficient input content
+  5. **Specificity**: Be specific about desired output format
+</Accordion>
+
+## Advanced Configuration
+
+### Custom System Prompts
+
+To customize AI behavior, modify the system prompts in `openai.service.ts`:
+
+```typescript
+{
+  role: 'system',
+  content: 'Your custom instructions here'
+}
+```
+
+### Alternative Models
+
+To use different models, update the model parameter:
+
+```typescript
+model: 'gpt-3.5-turbo'  // Cheaper but lower quality
+model: 'gpt-4.1'        // Current default
+model: 'gpt-4o'         // Latest model
+```
+
+### Temperature Control
+
+Adjust creativity vs consistency:
+
+```typescript
+temperature: 0.7  // More consistent
+temperature: 1.0  // Current default - balanced
+temperature: 1.5  // More creative
+```
+
+## Security Best Practices
+
+<Warning>
+  Never expose your OpenAI API key in client-side code or commit it to version control.
+</Warning>
+
+- Store API key in environment variables only
+- Rotate keys periodically
+- Set usage limits to prevent abuse
+- Monitor for unusual activity
+- Implement rate limiting for AI features
+- Use separate keys for development and production
+
+## Disabling AI Features
+
+To completely disable AI features:
+
+```bash
+# Remove or comment out the OPENAI_API_KEY
+# OPENAI_API_KEY=""
+```
+
+Postiz will continue to function normally without AI capabilities.
+
+## Next Steps
+
+After configuring AI integration:
+
+- [OAuth Apps](/configuration/oauth-apps) - Set up social media platforms
+- [Email Setup](/configuration/email-setup) - Configure email delivery
+- [Billing Configuration](/configuration/billing-stripe) - Set up payments
+- [Short Links](/configuration/short-links) - Configure URL shortening

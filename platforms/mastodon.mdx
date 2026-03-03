@@ -1,0 +1,249 @@
+---
+title: 'Mastodon Integration'
+description: 'Post to Mastodon and compatible fediverse instances'
+---
+
+## Overview
+
+Postiz supports Mastodon and other fediverse instances using the Mastodon API, allowing you to post text, images, and videos to the decentralized social network.
+
+<Note>
+  **Custom Instances Supported**: Connect to any Mastodon-compatible instance by configuring the instance URL.
+</Note>
+
+## Authentication
+
+Mastodon uses OAuth 2.0 authentication.
+
+<Steps>
+  <Step title="Configure Instance">
+    Set `MASTODON_URL` environment variable (default: `https://mastodon.social`)
+  </Step>
+  
+  <Step title="Connect Account">
+    Click "Connect Mastodon" in Integrations
+  </Step>
+  
+  <Step title="Authorize">
+    Grant permissions on your Mastodon instance
+  </Step>
+</Steps>
+
+### Required Permissions
+
+- `write:statuses` - Create and delete posts
+- `profile` - Read profile information
+- `write:media` - Upload media files
+
+### Custom Instance Setup
+
+To connect to a custom instance:
+
+1. Set environment variables:
+   ```bash
+   MASTODON_URL=https://your-instance.social
+   MASTODON_CLIENT_ID=your_client_id
+   MASTODON_CLIENT_SECRET=your_client_secret
+   ```
+
+2. Register OAuth application on your instance
+
+3. Configure redirect URI: `{FRONTEND_URL}/integrations/social/mastodon`
+
+## Supported Features
+
+### Content Types
+
+<Tabs>
+  <Tab title="Text Posts">
+    - **Maximum**: 500 characters (instance may vary)
+    - Plain text
+    - URLs automatically linked
+    - Hashtags supported
+  </Tab>
+  
+  <Tab title="Image Posts">
+    - Multiple images supported
+    - Images uploaded to instance
+    - Alt text not currently implemented
+  </Tab>
+  
+  <Tab title="Video Posts">
+    - Multiple videos supported
+    - Uploaded to instance media storage
+    - MP4 and other formats
+  </Tab>
+</Tabs>
+
+### Visibility Settings
+
+All posts are set to **public** visibility.
+
+Future support may include:
+- Unlisted
+- Followers-only
+- Direct messages
+
+## Media Upload
+
+Media upload process:
+
+<Steps>
+  <Step title="Fetch Media">
+    Download media from provided URL
+  </Step>
+  
+  <Step title="Upload to Instance">
+    POST to `/api/v1/media` endpoint
+  </Step>
+  
+  <Step title="Get Media ID">
+    Receive media ID for post attachment
+  </Step>
+  
+  <Step title="Attach to Post">
+    Include media IDs in post creation
+  </Step>
+</Steps>
+
+<CodeGroup>
+```typescript Media Upload
+const form = new FormData();
+form.append('file', await fetch(fileUrl).then(r => r.blob()));
+
+const media = await fetch(`${instanceUrl}/api/v1/media`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${accessToken}` },
+  body: form
+});
+
+const { id } = await media.json();
+```
+</CodeGroup>
+
+## Posting Content
+
+Create posts with text and media:
+
+<CodeGroup>
+```typescript Post Structure
+{
+  status: "Your post text",
+  visibility: "public",
+  media_ids: ["123", "456"]  // Optional
+}
+```
+</CodeGroup>
+
+Response includes:
+- Post ID
+- Post URL: `{instanceUrl}/statuses/{postId}`
+
+## Replies & Threads
+
+Create threaded conversations:
+
+<Steps>
+  <Step title="Main Post">
+    Create initial post
+  </Step>
+  
+  <Step title="Reply">
+    Set `in_reply_to_id` to parent post ID
+  </Step>
+  
+  <Step title="Thread Chain">
+    Continue referencing previous post
+  </Step>
+</Steps>
+
+<CodeGroup>
+```typescript Reply Structure
+{
+  status: "Reply text",
+  visibility: "public",
+  in_reply_to_id: "12345",
+  media_ids: []  // Optional
+}
+```
+</CodeGroup>
+
+## Rate Limits
+
+<Info>
+  **Mastodon Rate Limits:**
+  - 5 concurrent posting jobs
+  - Rate limits vary by instance
+  - Typically generous for posting
+  - Media uploads count separately
+</Info>
+
+## Instance Compatibility
+
+Postiz is compatible with:
+
+- **Mastodon** - Official implementation
+- **Pleroma** - Lightweight alternative
+- **Akkoma** - Pleroma fork
+- **Misskey** - May require adapter
+- Other Mastodon API-compatible servers
+
+<Note>
+  Compatibility depends on instance implementing Mastodon's API correctly.
+</Note>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Character Limits">
+    Respect your instance's character limit (usually 500)
+  </Card>
+  
+  <Card title="Content Warnings">
+    Add CW for sensitive content (future feature)
+  </Card>
+  
+  <Card title="Hashtags">
+    Use relevant hashtags for discovery
+  </Card>
+  
+  <Card title="Instance Rules">
+    Follow your instance's community guidelines
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Connection Failed">
+    If can't connect to instance:
+    - Verify instance URL is correct
+    - Check instance is online
+    - Ensure OAuth app is registered
+    - Verify client ID and secret
+  </Accordion>
+  
+  <Accordion title="Media Upload Failed">
+    Media upload issues:
+    - Check file format is supported
+    - Verify file size within limits
+    - Ensure instance has storage available
+    - Try smaller file size
+  </Accordion>
+  
+  <Accordion title="Post Not Appearing">
+    If post doesn't show:
+    - Check post was created (response has ID)
+    - Verify visibility settings
+    - Instance may be federating slowly
+    - Check local vs federated timeline
+  </Accordion>
+  
+  <Accordion title="Token Expired">
+    Authentication issues:
+    - Mastodon tokens are long-lived
+    - If expired, reconnect account
+    - Check instance hasn't reset tokens
+    - Verify OAuth app still exists
+  </Accordion>
+</AccordionGroup>

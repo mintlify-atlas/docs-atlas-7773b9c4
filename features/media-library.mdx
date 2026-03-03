@@ -1,0 +1,703 @@
+---
+title: 'Media Library'
+description: 'Centralized media management for images, videos, and assets across all your social media posts'
+---
+
+## Overview
+
+The Postiz Media Library is your centralized hub for managing all media assets used across your social media posts. Upload, organize, and reuse images, videos, and other media files efficiently.
+
+## Accessing the Media Library
+
+The media library can be accessed in several ways:
+
+<CardGroup cols={2}>
+  <Card title="Post Editor" icon="pen">
+    Click "Insert Media" when creating or editing a post
+  </Card>
+  <Card title="Standalone Page" icon="images">
+    Navigate to Media Library from the main menu
+  </Card>
+  <Card title="Quick Upload" icon="cloud-arrow-up">
+    Drag and drop files directly into the post editor
+  </Card>
+  <Card title="API Upload" icon="code">
+    Upload via REST API for integration workflows
+  </Card>
+</CardGroup>
+
+## Uploading Media
+
+### Upload Methods
+
+<Tabs>
+  <Tab title="Drag and Drop">
+    Simply drag files from your computer into the media library.
+    
+    ```typescript
+    const dragAndDrop = async (files: File[]) => {
+      const totalSize = files.reduce((acc, file) => acc + file.size, 0);
+      
+      // Maximum 1GB per upload session
+      if (totalSize > MAX_UPLOAD_SIZE) {
+        toaster.show(
+          'Upload size limit exceeded. Maximum 1 GB per upload.',
+          'warning'
+        );
+        return;
+      }
+      
+      for (const file of files) {
+        uppy.addFile(file);
+      }
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Click to Upload">
+    Click the Upload button and select files from your computer.
+    
+    ```typescript
+    const addToUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || []);
+      const totalSize = files.reduce((acc, file) => acc + file.size, 0);
+      
+      if (totalSize > MAX_UPLOAD_SIZE) {
+        toaster.show('Upload size limit exceeded', 'warning');
+        return;
+      }
+      
+      uppy.addFiles(files);
+    };
+    ```
+  </Tab>
+  
+  <Tab title="API Upload">
+    Upload files programmatically via the REST API.
+    
+    ```typescript
+    // POST /media/upload-simple
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch('/media/upload-simple', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const { id, path } = await response.json();
+    ```
+  </Tab>
+  
+  <Tab title="Multipart Upload">
+    For large files, use multipart upload for reliability.
+    
+    ```typescript
+    // Large file upload using R2 multipart
+    const upload = await handleR2Upload('complete-multipart-upload', req, res);
+    
+    // Save to media library
+    const name = upload.Location.split('/').pop();
+    await saveFile(org.id, name, upload.Location);
+    ```
+  </Tab>
+</Tabs>
+
+### Upload Limits
+
+<Info>
+  - **Maximum file size**: 1 GB per upload session
+  - **Supported formats**: Images (JPEG, PNG, GIF, WebP), Videos (MP4, MOV)
+  - **Storage**: Cloud-based (Cloudflare R2 or local storage)
+</Info>
+
+## Upload Service
+
+Postiz uses Uppy for robust file uploading:
+
+```typescript
+import Uppy from '@uppy/core';
+import Dashboard from '@uppy/dashboard';
+
+const useUppyUploader = ({ 
+  allowedFileTypes,
+  onUploadSuccess,
+  onStart,
+  onEnd 
+}) => {
+  const uppy = new Uppy({
+    restrictions: {
+      allowedFileTypes: allowedFileTypes.split(','),
+      maxFileSize: MAX_UPLOAD_SIZE,
+    },
+  });
+  
+  uppy.on('upload', () => {
+    onStart?.();
+  });
+  
+  uppy.on('complete', async (result) => {
+    const files = result.successful.map(file => ({
+      id: file.meta.mediaId,
+      path: file.meta.mediaPath
+    }));
+    
+    onUploadSuccess?.(files);
+    onEnd?.();
+  });
+  
+  return uppy;
+};
+```
+
+## Media Storage Backend
+
+### Storage Factory
+
+Postiz supports multiple storage backends:
+
+```typescript
+// libraries/nestjs-libraries/src/upload/upload.factory.ts
+export class UploadFactory {
+  static createStorage() {
+    const type = process.env.UPLOAD_DIRECTORY;
+    
+    switch (type) {
+      case 'cloudflare':
+        return new CloudflareStorage();
+      case 'local':
+        return new LocalStorage();
+      default:
+        return new LocalStorage();
+    }
+  }
+}
+```
+
+### Cloudflare R2 Storage
+
+```typescript
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+
+export class CloudflareStorage {
+  private s3Client: S3Client;
+  
+  constructor() {
+    this.s3Client = new S3Client({
+      region: 'auto',
+      endpoint: process.env.CLOUDFLARE_ENDPOINT,
+      credentials: {
+        accessKeyId: process.env.CLOUDFLARE_ACCESS_KEY_ID,
+        secretAccessKey: process.env.CLOUDFLARE_SECRET_ACCESS_KEY,
+      },
+    });
+  }
+  
+  async uploadFile(file: Express.Multer.File) {
+    const key = `${Date.now()}-${file.originalname}`;
+    
+    await this.s3Client.send(
+      new PutObjectCommand({
+        Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      })
+    );
+    
+    return {
+      path: `${process.env.CLOUDFLARE_BUCKET_URL}/${key}`,
+      originalname: file.originalname
+    };
+  }
+}
+```
+
+## Browsing Media
+
+### Media Grid View
+
+The media library displays files in a paginated grid:
+
+```typescript
+const MediaBox = ({ setMedia, type }) => {
+  const [page, setPage] = useState(0);
+  
+  const loadMedia = useCallback(async () => {
+    return await fetch(`/media?page=${page + 1}`).json();
+  }, [page]);
+  
+  const { data, isLoading } = useSWR(`get-media-${page}`, loadMedia);
+  
+  return (
+    <div className="media-grid">
+      {data?.results?.map(media => (
+        <MediaCard key={media.id} media={media} />
+      ))}
+      
+      {data?.pages > 1 && (
+        <Pagination 
+          current={page}
+          totalPages={data.pages}
+          setPage={setPage}
+        />
+      )}
+    </div>
+  );
+};
+```
+
+### Filtering Media
+
+<Tabs>
+  <Tab title="Images Only">
+    ```typescript
+    const imageFiles = data?.results?.filter(f => 
+      f.path.indexOf('mp4') === -1
+    );
+    ```
+  </Tab>
+  
+  <Tab title="Videos Only">
+    ```typescript
+    const videoFiles = data?.results?.filter(f => 
+      f.path.indexOf('mp4') > -1
+    );
+    ```
+  </Tab>
+  
+  <Tab title="All Media">
+    Display all media types without filtering.
+  </Tab>
+</Tabs>
+
+## Media API Endpoints
+
+### Fetching Media
+
+```typescript
+// GET /media?page=1
+interface MediaResponse {
+  results: Media[];
+  pages: number;
+  total: number;
+}
+
+interface Media {
+  id: string;
+  name: string;
+  path: string;
+  originalName?: string;
+  createdAt: string;
+  organizationId: string;
+}
+```
+
+### Saving Media
+
+```typescript
+// Controller: media.controller.ts
+@Post('/upload-simple')
+async uploadSimple(
+  @GetOrgFromRequest() org: Organization,
+  @UploadedFile() file: Express.Multer.File,
+  @Body('preventSave') preventSave: string = 'false'
+) {
+  const originalName = file.originalname;
+  const uploadedFile = await this.storage.uploadFile(file);
+  
+  if (preventSave === 'true') {
+    return { path: uploadedFile.path };
+  }
+  
+  return this._mediaService.saveFile(
+    org.id,
+    uploadedFile.originalname,
+    uploadedFile.path,
+    originalName
+  );
+}
+```
+
+### Deleting Media
+
+```typescript
+// DELETE /media/:id
+const deleteImage = async (mediaId: string) => {
+  if (!await deleteDialog(
+    'Are you sure you want to delete the image?'
+  )) {
+    return;
+  }
+  
+  await fetch(`/media/${mediaId}`, {
+    method: 'DELETE'
+  });
+  
+  mutate(); // Refresh media list
+};
+```
+
+## Using Media in Posts
+
+### Selecting Media
+
+```typescript
+const MultiMediaComponent = ({ name, onChange, value }) => {
+  const [currentMedia, setCurrentMedia] = useState(value);
+  
+  const showModal = () => {
+    modals.openModal({
+      title: 'Media Library',
+      fullScreen: true,
+      children: (close) => (
+        <MediaBox 
+          setMedia={(media) => {
+            const newMedia = [...currentMedia, ...media];
+            setCurrentMedia(newMedia);
+            onChange({
+              target: { name, value: newMedia }
+            });
+            close();
+          }}
+          closeModal={close}
+        />
+      )
+    });
+  };
+  
+  return (
+    <button onClick={showModal}>
+      Insert Media
+    </button>
+  );
+};
+```
+
+### Media Settings
+
+Configure media-specific settings for each post:
+
+```typescript
+interface MediaSettings {
+  alt?: string;              // Alt text for accessibility
+  thumbnail?: string;        // Video thumbnail
+  thumbnailTimestamp?: number; // Video thumbnail timestamp
+}
+
+const MediaComponentInner = ({ media, onSelect, onClose }) => {
+  const [settings, setSettings] = useState<MediaSettings>({
+    alt: media.alt || '',
+    thumbnail: media.thumbnail,
+    thumbnailTimestamp: media.thumbnailTimestamp || 0
+  });
+  
+  const save = () => {
+    onSelect(settings);
+    onClose();
+  };
+  
+  return (
+    <div>
+      <Input 
+        label="Alt Text"
+        value={settings.alt}
+        onChange={(e) => setSettings({ ...settings, alt: e.target.value })}
+      />
+      {/* Video thumbnail settings */}
+      <button onClick={save}>Save</button>
+    </div>
+  );
+};
+```
+
+## Media Organization
+
+### Drag to Reorder
+
+Reorder media in posts using drag and drop:
+
+```typescript
+import { ReactSortable } from 'react-sortablejs';
+
+<ReactSortable
+  list={currentMedia}
+  setList={(value) => onChange({ target: { name: 'upload', value } })}
+  className="flex gap-[10px]"
+  animation={200}
+  swap={true}
+  handle=".dragging"
+>
+  {currentMedia.map((media, index) => (
+    <MediaCard key={media.id} media={media} index={index} />
+  ))}
+</ReactSortable>
+```
+
+### Media Metadata
+
+```typescript
+// POST /media/information
+interface SaveMediaInformationDto {
+  mediaId: string;
+  alt?: string;
+  description?: string;
+  tags?: string[];
+}
+
+const saveMediaInformation = async (data: SaveMediaInformationDto) => {
+  await fetch('/media/information', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+};
+```
+
+## AI-Generated Media
+
+### Generate Images
+
+```typescript
+// POST /media/generate-image-with-prompt
+const generateImage = async (prompt: string) => {
+  const response = await fetch('/media/generate-image-with-prompt', {
+    method: 'POST',
+    body: JSON.stringify({ prompt })
+  });
+  
+  const media = await response.json();
+  return media; // Automatically saved to library
+};
+```
+
+### Generate Videos
+
+```typescript
+// POST /media/generate-video
+interface VideoDto {
+  identifier: string;  // 'veo3' or 'image-text-slides'
+  prompt?: string;
+  images?: Array<{ path: string }>;
+  duration?: number;
+}
+
+const generateVideo = async (config: VideoDto) => {
+  const response = await fetch('/media/generate-video', {
+    method: 'POST',
+    body: JSON.stringify(config)
+  });
+  
+  return await response.json();
+};
+```
+
+## Third-Party Media
+
+Integrate media from third-party sources:
+
+```typescript
+const ThirdPartyMedia = ({ onChange }) => {
+  const sources = [
+    { name: 'Unsplash', icon: 'unsplash' },
+    { name: 'Pexels', icon: 'pexels' },
+    { name: 'Giphy', icon: 'giphy' }
+  ];
+  
+  const selectFromSource = (source: string) => {
+    modal.openModal({
+      title: `Select from ${source}`,
+      children: <ThirdPartyPicker 
+        source={source}
+        onSelect={onChange}
+      />
+    });
+  };
+};
+```
+
+## Video Handling
+
+### Video Previews
+
+```typescript
+import { VideoFrame } from '@gitroom/react/helpers/video.frame';
+
+const VideoPreview = ({ url }) => {
+  return (
+    <VideoFrame 
+      url={url}
+      autoplay={false}
+    />
+  );
+};
+```
+
+### Video Thumbnails
+
+Generate and set custom video thumbnails:
+
+```typescript
+const setVideoThumbnail = (media: Media, timestamp: number) => {
+  // Extract frame at timestamp
+  const thumbnail = extractVideoFrame(media.path, timestamp);
+  
+  // Update media settings
+  onChange({
+    ...media,
+    thumbnail,
+    thumbnailTimestamp: timestamp
+  });
+};
+```
+
+## Media Optimization
+
+<Accordion title="Automatic Optimizations">
+  - **Image Compression** - Images are automatically compressed for web
+  - **Format Conversion** - Convert to optimal formats (WebP for images)
+  - **Lazy Loading** - Media loads only when visible
+  - **CDN Delivery** - Fast delivery via Cloudflare CDN
+  
+  ```typescript
+  const mediaDirectory = useMediaDirectory();
+  
+  // Automatically adds CDN URL and optimizations
+  const optimizedUrl = mediaDirectory.set(media.path);
+  ```
+</Accordion>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Descriptive Names" icon="tag">
+    Name your media files descriptively before uploading for easy identification.
+  </Card>
+  
+  <Card title="Add Alt Text" icon="universal-access">
+    Always add alt text to images for accessibility and SEO.
+  </Card>
+  
+  <Card title="Optimize Before Upload" icon="gauge-high">
+    Compress large images before uploading to save storage and bandwidth.
+  </Card>
+  
+  <Card title="Regular Cleanup" icon="broom">
+    Periodically delete unused media to keep your library organized.
+  </Card>
+</CardGroup>
+
+## Pagination Component
+
+The media library includes a smart pagination system:
+
+```typescript
+const Pagination = ({ current, totalPages, setPage }) => {
+  const paginationItems = useMemo(() => {
+    if (totalPages <= 10) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    
+    // Smart pagination with dots for large sets
+    const delta = 3;
+    const range = [];
+    
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || 
+          (i >= current - delta && i < current + delta)) {
+        range.push(i);
+      }
+    }
+    
+    // Add dots where there are gaps
+    const withDots = [];
+    let prev;
+    for (const i of range) {
+      if (prev !== undefined && i - prev > 1) {
+        withDots.push('...');
+      }
+      withDots.push(i);
+      prev = i;
+    }
+    
+    return withDots;
+  }, [current, totalPages]);
+  
+  return (
+    <ul className="flex gap-1">
+      <li>
+        <button onClick={() => setPage(current - 1)}>
+          Previous
+        </button>
+      </li>
+      {paginationItems.map((item, index) => (
+        <li key={index}>
+          {item === '...' ? (
+            <span>...</span>
+          ) : (
+            <button onClick={() => setPage(item - 1)}>
+              {item}
+            </button>
+          )}
+        </li>
+      ))}
+      <li>
+        <button onClick={() => setPage(current + 1)}>
+          Next
+        </button>
+      </li>
+    </ul>
+  );
+};
+```
+
+## Troubleshooting
+
+<Tabs>
+  <Tab title="Upload Failed">
+    1. Check file size is under 1GB
+    2. Verify file format is supported
+    3. Check internet connection
+    4. Try uploading smaller batches
+    5. Clear browser cache
+  </Tab>
+  
+  <Tab title="Media Not Displaying">
+    1. Check storage service status
+    2. Verify CDN configuration
+    3. Check browser console for errors
+    4. Try refreshing the page
+    5. Clear media cache
+  </Tab>
+  
+  <Tab title="Slow Upload">
+    1. Check your internet connection speed
+    2. Upload smaller files first
+    3. Use multipart upload for large files
+    4. Compress images before uploading
+    5. Try at off-peak hours
+  </Tab>
+</Tabs>
+
+## API Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/media` | GET | Fetch paginated media |
+| `/media/upload-simple` | POST | Upload single file |
+| `/media/upload-server` | POST | Upload with server processing |
+| `/media/:endpoint` | POST | Multipart upload endpoints |
+| `/media/:id` | DELETE | Delete media file |
+| `/media/information` | POST | Save media metadata |
+| `/media/generate-image` | POST | Generate AI image |
+| `/media/generate-video` | POST | Generate AI video |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Post Scheduling" icon="calendar" href="/features/scheduling">
+    Use your media library assets in scheduled posts
+  </Card>
+  <Card title="AI Features" icon="sparkles" href="/features/ai-features">
+    Generate images and videos with AI
+  </Card>
+</CardGroup>

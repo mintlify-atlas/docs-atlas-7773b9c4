@@ -1,0 +1,952 @@
+---
+title: Environment Variables Reference
+description: Complete guide to all Postiz environment variables and configuration options
+---
+
+# Environment Variables Reference
+
+This page provides a comprehensive reference for all environment variables used in Postiz. Use this guide to configure your self-hosted instance.
+
+## Configuration File
+
+You can configure Postiz using environment variables in:
+
+1. Docker Compose `environment:` section
+2. `.env` file (recommended for production)
+3. System environment variables
+
+<Tip>
+Download the example configuration:
+
+```bash
+curl -O https://raw.githubusercontent.com/gitroomhq/postiz-app/main/.env.example
+cp .env.example .env
+```
+</Tip>
+
+## Required Settings
+
+These variables are essential for Postiz to function:
+
+### Application URLs
+
+<ParamField path="MAIN_URL" type="string" required>
+  The main URL where Postiz is accessible
+  
+  ```bash
+  MAIN_URL="http://localhost:4007"
+  # Production:
+  MAIN_URL="https://postiz.yourdomain.com"
+  ```
+</ParamField>
+
+<ParamField path="FRONTEND_URL" type="string" required>
+  The frontend application URL (usually same as MAIN_URL)
+  
+  ```bash
+  FRONTEND_URL="http://localhost:4007"
+  ```
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_BACKEND_URL" type="string" required>
+  The backend API URL accessible from the browser
+  
+  ```bash
+  NEXT_PUBLIC_BACKEND_URL="http://localhost:4007/api"
+  # Production:
+  NEXT_PUBLIC_BACKEND_URL="https://postiz.yourdomain.com/api"
+  ```
+</ParamField>
+
+<ParamField path="BACKEND_INTERNAL_URL" type="string" required>
+  Internal backend URL for server-side requests
+  
+  ```bash
+  BACKEND_INTERNAL_URL="http://localhost:3000"
+  ```
+</ParamField>
+
+### Security
+
+<ParamField path="JWT_SECRET" type="string" required>
+  Secret key for signing JWT tokens. **MUST be unique and random!**
+  
+  ```bash
+  JWT_SECRET="your-super-long-random-string-here"
+  ```
+  
+  <Warning>
+  Generate a secure random string:
+  
+  ```bash
+  openssl rand -base64 32
+  ```
+  
+  Never use the example value in production!
+  </Warning>
+</ParamField>
+
+### Database
+
+<ParamField path="DATABASE_URL" type="string" required>
+  PostgreSQL connection string
+  
+  ```bash
+  DATABASE_URL="postgresql://postiz-user:postiz-password@localhost:5432/postiz-db-local"
+  ```
+  
+  Format: `postgresql://[user]:[password]@[host]:[port]/[database]`
+  
+  For Docker Compose:
+  ```bash
+  DATABASE_URL="postgresql://postiz-user:postiz-password@postiz-postgres:5432/postiz-db-local"
+  ```
+</ParamField>
+
+<ParamField path="REDIS_URL" type="string" required>
+  Redis connection string
+  
+  ```bash
+  REDIS_URL="redis://localhost:6379"
+  ```
+  
+  For Docker Compose:
+  ```bash
+  REDIS_URL="redis://postiz-redis:6379"
+  ```
+</ParamField>
+
+### Temporal
+
+<ParamField path="TEMPORAL_ADDRESS" type="string" required>
+  Temporal server address for workflow orchestration
+  
+  ```bash
+  TEMPORAL_ADDRESS="temporal:7233"
+  ```
+</ParamField>
+
+### System Flags
+
+<ParamField path="IS_GENERAL" type="boolean" required>
+  Required for current version. Always set to `true`.
+  
+  ```bash
+  IS_GENERAL="true"
+  ```
+</ParamField>
+
+<ParamField path="DISABLE_REGISTRATION" type="boolean" default="false">
+  Disable new user registration
+  
+  ```bash
+  DISABLE_REGISTRATION="false"
+  ```
+  
+  Set to `"true"` to disable public registration.
+</ParamField>
+
+## Storage Settings
+
+Configure where media files are stored:
+
+<ParamField path="STORAGE_PROVIDER" type="string" default="local">
+  Storage backend: `local` or `cloudflare`
+  
+  ```bash
+  STORAGE_PROVIDER="local"
+  ```
+</ParamField>
+
+### Local Storage
+
+<ParamField path="UPLOAD_DIRECTORY" type="string" default="/uploads">
+  Directory path for storing uploaded files (local storage only)
+  
+  ```bash
+  UPLOAD_DIRECTORY="/uploads"
+  ```
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_UPLOAD_DIRECTORY" type="string" default="/uploads">
+  Public URL path for accessing uploaded files
+  
+  ```bash
+  NEXT_PUBLIC_UPLOAD_DIRECTORY="/uploads"
+  ```
+</ParamField>
+
+### Cloudflare R2 Storage
+
+<Info>
+Cloudflare R2 is required for production deployments to save social media avatars and other assets.
+</Info>
+
+<ParamField path="CLOUDFLARE_ACCOUNT_ID" type="string">
+  Your Cloudflare account ID
+  
+  ```bash
+  CLOUDFLARE_ACCOUNT_ID="your-account-id"
+  ```
+</ParamField>
+
+<ParamField path="CLOUDFLARE_ACCESS_KEY" type="string">
+  Cloudflare R2 access key
+  
+  ```bash
+  CLOUDFLARE_ACCESS_KEY="your-access-key"
+  ```
+</ParamField>
+
+<ParamField path="CLOUDFLARE_SECRET_ACCESS_KEY" type="string">
+  Cloudflare R2 secret access key
+  
+  ```bash
+  CLOUDFLARE_SECRET_ACCESS_KEY="your-secret-access-key"
+  ```
+</ParamField>
+
+<ParamField path="CLOUDFLARE_BUCKETNAME" type="string">
+  R2 bucket name
+  
+  ```bash
+  CLOUDFLARE_BUCKETNAME="postiz-uploads"
+  ```
+</ParamField>
+
+<ParamField path="CLOUDFLARE_BUCKET_URL" type="string">
+  Public URL for your R2 bucket
+  
+  ```bash
+  CLOUDFLARE_BUCKET_URL="https://your-bucket-url.r2.cloudflarestorage.com/"
+  ```
+</ParamField>
+
+<ParamField path="CLOUDFLARE_REGION" type="string" default="auto">
+  Cloudflare R2 region
+  
+  ```bash
+  CLOUDFLARE_REGION="auto"
+  ```
+</ParamField>
+
+## Social Media OAuth
+
+Configure OAuth credentials for each social media platform you want to support:
+
+### X (Twitter)
+
+<ParamField path="X_API_KEY" type="string">
+  Twitter/X API key
+  
+  ```bash
+  X_API_KEY="your-x-api-key"
+  ```
+</ParamField>
+
+<ParamField path="X_API_SECRET" type="string">
+  Twitter/X API secret
+  
+  ```bash
+  X_API_SECRET="your-x-api-secret"
+  ```
+</ParamField>
+
+### LinkedIn
+
+<ParamField path="LINKEDIN_CLIENT_ID" type="string">
+  LinkedIn OAuth client ID
+  
+  ```bash
+  LINKEDIN_CLIENT_ID="your-linkedin-client-id"
+  ```
+</ParamField>
+
+<ParamField path="LINKEDIN_CLIENT_SECRET" type="string">
+  LinkedIn OAuth client secret
+  
+  ```bash
+  LINKEDIN_CLIENT_SECRET="your-linkedin-client-secret"
+  ```
+</ParamField>
+
+### Reddit
+
+<ParamField path="REDDIT_CLIENT_ID" type="string">
+  Reddit OAuth client ID
+  
+  ```bash
+  REDDIT_CLIENT_ID="your-reddit-client-id"
+  ```
+</ParamField>
+
+<ParamField path="REDDIT_CLIENT_SECRET" type="string">
+  Reddit OAuth client secret
+  
+  ```bash
+  REDDIT_CLIENT_SECRET="your-reddit-client-secret"
+  ```
+</ParamField>
+
+### GitHub
+
+<ParamField path="GITHUB_CLIENT_ID" type="string">
+  GitHub OAuth app client ID
+  
+  ```bash
+  GITHUB_CLIENT_ID="your-github-client-id"
+  ```
+</ParamField>
+
+<ParamField path="GITHUB_CLIENT_SECRET" type="string">
+  GitHub OAuth app client secret
+  
+  ```bash
+  GITHUB_CLIENT_SECRET="your-github-client-secret"
+  ```
+</ParamField>
+
+### Facebook
+
+<ParamField path="FACEBOOK_APP_ID" type="string">
+  Facebook App ID
+  
+  ```bash
+  FACEBOOK_APP_ID="your-facebook-app-id"
+  ```
+</ParamField>
+
+<ParamField path="FACEBOOK_APP_SECRET" type="string">
+  Facebook App Secret
+  
+  ```bash
+  FACEBOOK_APP_SECRET="your-facebook-app-secret"
+  ```
+</ParamField>
+
+### Threads
+
+<ParamField path="THREADS_APP_ID" type="string">
+  Meta Threads App ID
+  
+  ```bash
+  THREADS_APP_ID="your-threads-app-id"
+  ```
+</ParamField>
+
+<ParamField path="THREADS_APP_SECRET" type="string">
+  Meta Threads App Secret
+  
+  ```bash
+  THREADS_APP_SECRET="your-threads-app-secret"
+  ```
+</ParamField>
+
+### YouTube
+
+<ParamField path="YOUTUBE_CLIENT_ID" type="string">
+  Google OAuth client ID for YouTube
+  
+  ```bash
+  YOUTUBE_CLIENT_ID="your-youtube-client-id"
+  ```
+</ParamField>
+
+<ParamField path="YOUTUBE_CLIENT_SECRET" type="string">
+  Google OAuth client secret for YouTube
+  
+  ```bash
+  YOUTUBE_CLIENT_SECRET="your-youtube-client-secret"
+  ```
+</ParamField>
+
+### TikTok
+
+<ParamField path="TIKTOK_CLIENT_ID" type="string">
+  TikTok OAuth client ID
+  
+  ```bash
+  TIKTOK_CLIENT_ID="your-tiktok-client-id"
+  ```
+</ParamField>
+
+<ParamField path="TIKTOK_CLIENT_SECRET" type="string">
+  TikTok OAuth client secret
+  
+  ```bash
+  TIKTOK_CLIENT_SECRET="your-tiktok-client-secret"
+  ```
+</ParamField>
+
+### Pinterest
+
+<ParamField path="PINTEREST_CLIENT_ID" type="string">
+  Pinterest OAuth client ID
+  
+  ```bash
+  PINTEREST_CLIENT_ID="your-pinterest-client-id"
+  ```
+</ParamField>
+
+<ParamField path="PINTEREST_CLIENT_SECRET" type="string">
+  Pinterest OAuth client secret
+  
+  ```bash
+  PINTEREST_CLIENT_SECRET="your-pinterest-client-secret"
+  ```
+</ParamField>
+
+### Dribbble
+
+<ParamField path="DRIBBBLE_CLIENT_ID" type="string">
+  Dribbble OAuth client ID
+  
+  ```bash
+  DRIBBBLE_CLIENT_ID="your-dribbble-client-id"
+  ```
+</ParamField>
+
+<ParamField path="DRIBBBLE_CLIENT_SECRET" type="string">
+  Dribbble OAuth client secret
+  
+  ```bash
+  DRIBBBLE_CLIENT_SECRET="your-dribbble-client-secret"
+  ```
+</ParamField>
+
+### Discord
+
+<ParamField path="DISCORD_CLIENT_ID" type="string">
+  Discord OAuth client ID
+  
+  ```bash
+  DISCORD_CLIENT_ID="your-discord-client-id"
+  ```
+</ParamField>
+
+<ParamField path="DISCORD_CLIENT_SECRET" type="string">
+  Discord OAuth client secret
+  
+  ```bash
+  DISCORD_CLIENT_SECRET="your-discord-client-secret"
+  ```
+</ParamField>
+
+<ParamField path="DISCORD_BOT_TOKEN_ID" type="string">
+  Discord bot token for posting
+  
+  ```bash
+  DISCORD_BOT_TOKEN_ID="your-discord-bot-token"
+  ```
+</ParamField>
+
+### Slack
+
+<ParamField path="SLACK_ID" type="string">
+  Slack app client ID
+  
+  ```bash
+  SLACK_ID="your-slack-client-id"
+  ```
+</ParamField>
+
+<ParamField path="SLACK_SECRET" type="string">
+  Slack app client secret
+  
+  ```bash
+  SLACK_SECRET="your-slack-client-secret"
+  ```
+</ParamField>
+
+<ParamField path="SLACK_SIGNING_SECRET" type="string">
+  Slack signing secret for request verification
+  
+  ```bash
+  SLACK_SIGNING_SECRET="your-slack-signing-secret"
+  ```
+</ParamField>
+
+### Mastodon
+
+<ParamField path="MASTODON_URL" type="string" default="https://mastodon.social">
+  Mastodon instance URL
+  
+  ```bash
+  MASTODON_URL="https://mastodon.social"
+  ```
+</ParamField>
+
+<ParamField path="MASTODON_CLIENT_ID" type="string">
+  Mastodon OAuth client ID
+  
+  ```bash
+  MASTODON_CLIENT_ID="your-mastodon-client-id"
+  ```
+</ParamField>
+
+<ParamField path="MASTODON_CLIENT_SECRET" type="string">
+  Mastodon OAuth client secret
+  
+  ```bash
+  MASTODON_CLIENT_SECRET="your-mastodon-client-secret"
+  ```
+</ParamField>
+
+### Beehiiv
+
+<ParamField path="BEEHIIVE_API_KEY" type="string">
+  Beehiiv API key
+  
+  ```bash
+  BEEHIIVE_API_KEY="your-beehiiv-api-key"
+  ```
+</ParamField>
+
+<ParamField path="BEEHIIVE_PUBLICATION_ID" type="string">
+  Beehiiv publication ID
+  
+  ```bash
+  BEEHIIVE_PUBLICATION_ID="your-publication-id"
+  ```
+</ParamField>
+
+### Listmonk
+
+<ParamField path="LISTMONK_DOMAIN" type="string">
+  Listmonk instance domain
+  
+  ```bash
+  LISTMONK_DOMAIN="https://newsletter.yourdomain.com"
+  ```
+</ParamField>
+
+<ParamField path="LISTMONK_USER" type="string">
+  Listmonk username
+  
+  ```bash
+  LISTMONK_USER="your-listmonk-username"
+  ```
+</ParamField>
+
+<ParamField path="LISTMONK_API_KEY" type="string">
+  Listmonk API key
+  
+  ```bash
+  LISTMONK_API_KEY="your-listmonk-api-key"
+  ```
+</ParamField>
+
+<ParamField path="LISTMONK_LIST_ID" type="string">
+  Listmonk list ID for subscribers
+  
+  ```bash
+  LISTMONK_LIST_ID="your-list-id"
+  ```
+</ParamField>
+
+## Generic OAuth Provider
+
+Postiz supports generic OAuth 2.0 providers like Authentik, Keycloak, etc.
+
+<ParamField path="POSTIZ_GENERIC_OAUTH" type="boolean" default="false">
+  Enable generic OAuth authentication
+  
+  ```bash
+  POSTIZ_GENERIC_OAUTH="false"
+  ```
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_POSTIZ_OAUTH_DISPLAY_NAME" type="string">
+  Display name for OAuth provider (shown on login button)
+  
+  ```bash
+  NEXT_PUBLIC_POSTIZ_OAUTH_DISPLAY_NAME="Authentik"
+  ```
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_POSTIZ_OAUTH_LOGO_URL" type="string">
+  Logo URL for OAuth provider
+  
+  ```bash
+  NEXT_PUBLIC_POSTIZ_OAUTH_LOGO_URL="https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/png/authentik.png"
+  ```
+</ParamField>
+
+<ParamField path="POSTIZ_OAUTH_URL" type="string">
+  Base URL of your OAuth provider
+  
+  ```bash
+  POSTIZ_OAUTH_URL="https://auth.example.com"
+  ```
+</ParamField>
+
+<ParamField path="POSTIZ_OAUTH_AUTH_URL" type="string">
+  OAuth authorization endpoint
+  
+  ```bash
+  POSTIZ_OAUTH_AUTH_URL="https://auth.example.com/application/o/authorize"
+  ```
+</ParamField>
+
+<ParamField path="POSTIZ_OAUTH_TOKEN_URL" type="string">
+  OAuth token endpoint
+  
+  ```bash
+  POSTIZ_OAUTH_TOKEN_URL="https://auth.example.com/application/o/token"
+  ```
+</ParamField>
+
+<ParamField path="POSTIZ_OAUTH_USERINFO_URL" type="string">
+  OAuth userinfo endpoint
+  
+  ```bash
+  POSTIZ_OAUTH_USERINFO_URL="https://auth.example.com/application/o/userinfo"
+  ```
+</ParamField>
+
+<ParamField path="POSTIZ_OAUTH_CLIENT_ID" type="string">
+  OAuth client ID
+  
+  ```bash
+  POSTIZ_OAUTH_CLIENT_ID="your-oauth-client-id"
+  ```
+</ParamField>
+
+<ParamField path="POSTIZ_OAUTH_CLIENT_SECRET" type="string">
+  OAuth client secret
+  
+  ```bash
+  POSTIZ_OAUTH_CLIENT_SECRET="your-oauth-client-secret"
+  ```
+</ParamField>
+
+<ParamField path="POSTIZ_OAUTH_SCOPE" type="string" default="openid profile email">
+  OAuth scopes to request
+  
+  ```bash
+  POSTIZ_OAUTH_SCOPE="openid profile email"
+  ```
+</ParamField>
+
+## Email Settings
+
+<ParamField path="RESEND_API_KEY" type="string">
+  Resend API key for sending emails
+  
+  ```bash
+  RESEND_API_KEY="re_yourApiKey"
+  ```
+  
+  <Info>
+  If this variable is set, user activation emails are required. If commented out, users are activated automatically.
+  </Info>
+</ParamField>
+
+<ParamField path="EMAIL_FROM_ADDRESS" type="string">
+  Email sender address
+  
+  ```bash
+  EMAIL_FROM_ADDRESS="noreply@yourdomain.com"
+  ```
+</ParamField>
+
+<ParamField path="EMAIL_FROM_NAME" type="string">
+  Email sender name
+  
+  ```bash
+  EMAIL_FROM_NAME="Postiz"
+  ```
+</ParamField>
+
+## AI Features
+
+<ParamField path="OPENAI_API_KEY" type="string">
+  OpenAI API key for AI-powered features
+  
+  ```bash
+  OPENAI_API_KEY="sk-your-openai-api-key"
+  ```
+</ParamField>
+
+## Short Link Services
+
+Postiz supports multiple URL shortening services:
+
+### Dub
+
+<ParamField path="DUB_TOKEN" type="string">
+  Dub API token
+  
+  ```bash
+  DUB_TOKEN="your-dub-token"
+  ```
+</ParamField>
+
+<ParamField path="DUB_API_ENDPOINT" type="string" default="https://api.dub.co">
+  Dub API endpoint
+  
+  ```bash
+  DUB_API_ENDPOINT="https://api.dub.co"
+  ```
+</ParamField>
+
+<ParamField path="DUB_SHORT_LINK_DOMAIN" type="string" default="dub.sh">
+  Dub short link domain
+  
+  ```bash
+  DUB_SHORT_LINK_DOMAIN="dub.sh"
+  ```
+</ParamField>
+
+### Short.io
+
+<ParamField path="SHORT_IO_SECRET_KEY" type="string">
+  Short.io API secret key
+  
+  ```bash
+  SHORT_IO_SECRET_KEY="your-short-io-key"
+  ```
+</ParamField>
+
+### Kutt
+
+<ParamField path="KUTT_API_KEY" type="string">
+  Kutt.it API key
+  
+  ```bash
+  KUTT_API_KEY="your-kutt-api-key"
+  ```
+</ParamField>
+
+<ParamField path="KUTT_API_ENDPOINT" type="string" default="https://kutt.it/api/v2">
+  Kutt API endpoint
+  
+  ```bash
+  KUTT_API_ENDPOINT="https://kutt.it/api/v2"
+  ```
+</ParamField>
+
+<ParamField path="KUTT_SHORT_LINK_DOMAIN" type="string" default="kutt.it">
+  Kutt short link domain
+  
+  ```bash
+  KUTT_SHORT_LINK_DOMAIN="kutt.it"
+  ```
+</ParamField>
+
+### LinkDrip
+
+<ParamField path="LINK_DRIP_API_KEY" type="string">
+  LinkDrip API key
+  
+  ```bash
+  LINK_DRIP_API_KEY="your-linkdrip-api-key"
+  ```
+</ParamField>
+
+<ParamField path="LINK_DRIP_API_ENDPOINT" type="string" default="https://api.linkdrip.com/v1/">
+  LinkDrip API endpoint
+  
+  ```bash
+  LINK_DRIP_API_ENDPOINT="https://api.linkdrip.com/v1/"
+  ```
+</ParamField>
+
+<ParamField path="LINK_DRIP_SHORT_LINK_DOMAIN" type="string" default="dripl.ink">
+  LinkDrip short link domain
+  
+  ```bash
+  LINK_DRIP_SHORT_LINK_DOMAIN="dripl.ink"
+  ```
+</ParamField>
+
+## Payment Settings
+
+<ParamField path="FEE_AMOUNT" type="number" default="0.05">
+  Fee percentage for transactions (0.05 = 5%)
+  
+  ```bash
+  FEE_AMOUNT=0.05
+  ```
+</ParamField>
+
+<ParamField path="STRIPE_PUBLISHABLE_KEY" type="string">
+  Stripe publishable key
+  
+  ```bash
+  STRIPE_PUBLISHABLE_KEY="pk_live_your_key"
+  ```
+</ParamField>
+
+<ParamField path="STRIPE_SECRET_KEY" type="string">
+  Stripe secret key
+  
+  ```bash
+  STRIPE_SECRET_KEY="sk_live_your_key"
+  ```
+</ParamField>
+
+<ParamField path="STRIPE_SIGNING_KEY" type="string">
+  Stripe webhook signing secret
+  
+  ```bash
+  STRIPE_SIGNING_KEY="whsec_your_key"
+  ```
+</ParamField>
+
+<ParamField path="STRIPE_SIGNING_KEY_CONNECT" type="string">
+  Stripe Connect webhook signing secret
+  
+  ```bash
+  STRIPE_SIGNING_KEY_CONNECT="whsec_your_connect_key"
+  ```
+</ParamField>
+
+## Monitoring and Debugging
+
+### Sentry
+
+<ParamField path="NEXT_PUBLIC_SENTRY_DSN" type="string">
+  Sentry DSN for error tracking
+  
+  ```bash
+  NEXT_PUBLIC_SENTRY_DSN="http://spotlight:8969/stream"
+  ```
+</ParamField>
+
+<ParamField path="SENTRY_SPOTLIGHT" type="boolean">
+  Enable Sentry Spotlight for local development
+  
+  ```bash
+  SENTRY_SPOTLIGHT="1"
+  ```
+</ParamField>
+
+## Miscellaneous
+
+<ParamField path="API_LIMIT" type="number" default="30">
+  Rate limit for public API (requests per hour)
+  
+  ```bash
+  API_LIMIT=30
+  ```
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_DISCORD_SUPPORT" type="string">
+  Discord support server invite link
+  
+  ```bash
+  NEXT_PUBLIC_DISCORD_SUPPORT="https://discord.gg/your-invite"
+  ```
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_POLOTNO" type="string">
+  Polotno API key for image editing features
+  
+  ```bash
+  NEXT_PUBLIC_POLOTNO="your-polotno-key"
+  ```
+</ParamField>
+
+<ParamField path="EXTENSION_ID" type="string">
+  Chrome extension ID for cookie-based platform integrations
+  
+  ```bash
+  EXTENSION_ID="your-extension-id"
+  ```
+</ParamField>
+
+<ParamField path="NOT_SECURED" type="boolean" default="false">
+  Disable security features (development only)
+  
+  ```bash
+  NOT_SECURED=false
+  ```
+  
+  <Warning>
+  Never set to `true` in production!
+  </Warning>
+</ParamField>
+
+## Developer Settings
+
+<ParamField path="NX_ADD_PLUGINS" type="boolean" default="false">
+  Enable NX plugins (monorepo development)
+  
+  ```bash
+  NX_ADD_PLUGINS=false
+  ```
+</ParamField>
+
+## Example Configuration
+
+Here's a minimal production-ready configuration:
+
+```bash .env
+# Required Settings
+MAIN_URL="https://postiz.yourdomain.com"
+FRONTEND_URL="https://postiz.yourdomain.com"
+NEXT_PUBLIC_BACKEND_URL="https://postiz.yourdomain.com/api"
+BACKEND_INTERNAL_URL="http://localhost:3000"
+
+# Security
+JWT_SECRET="your-super-long-random-secret-here"
+
+# Database
+DATABASE_URL="postgresql://postiz:secure_password@postiz-postgres:5432/postiz"
+REDIS_URL="redis://postiz-redis:6379"
+
+# Temporal
+TEMPORAL_ADDRESS="temporal:7233"
+
+# System
+IS_GENERAL="true"
+DISABLE_REGISTRATION="false"
+
+# Storage
+STORAGE_PROVIDER="cloudflare"
+CLOUDFLARE_ACCOUNT_ID="your-account-id"
+CLOUDFLARE_ACCESS_KEY="your-access-key"
+CLOUDFLARE_SECRET_ACCESS_KEY="your-secret"
+CLOUDFLARE_BUCKETNAME="postiz-uploads"
+CLOUDFLARE_BUCKET_URL="https://uploads.yourdomain.com/"
+CLOUDFLARE_REGION="auto"
+
+# Social Media (add as needed)
+X_API_KEY="your-x-api-key"
+X_API_SECRET="your-x-api-secret"
+LINKEDIN_CLIENT_ID="your-linkedin-id"
+LINKEDIN_CLIENT_SECRET="your-linkedin-secret"
+
+# Optional Features
+OPENAI_API_KEY="sk-your-openai-key"
+RESEND_API_KEY="re_your-resend-key"
+EMAIL_FROM_ADDRESS="noreply@yourdomain.com"
+```
+
+## Security Best Practices
+
+<Warning>
+1. **Never commit `.env` files** to version control
+2. **Use strong random values** for `JWT_SECRET`
+3. **Change default database passwords** in production
+4. **Enable HTTPS** for all production deployments
+5. **Restrict database access** to localhost or private networks
+6. **Regularly rotate secrets** and API keys
+</Warning>
+
+## Next Steps
+
+<Steps>
+  <Step title="Configure Storage">
+    Set up [storage configuration](/self-hosting/storage-configuration) for your deployment
+  </Step>
+  
+  <Step title="Add OAuth Providers">
+    Configure [authentication](/self-hosting/authentication) for social platforms
+  </Step>
+  
+  <Step title="Set Up Database">
+    Review the [database setup guide](/self-hosting/database-setup)
+  </Step>
+</Steps>

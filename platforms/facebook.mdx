@@ -1,0 +1,257 @@
+---
+title: 'Facebook Integration'
+description: 'Schedule posts to Facebook Pages with photos, videos, and links'
+---
+
+## Overview
+
+Postiz enables you to schedule and publish content to Facebook Pages with support for photos, videos, links, and comprehensive analytics.
+
+<Note>
+  **Facebook Pages Only**: This integration works with Facebook Pages, not personal profiles.
+</Note>
+
+## Authentication
+
+Facebook uses OAuth 2.0 authentication with long-lived access tokens.
+
+<Steps>
+  <Step title="Connect Facebook">
+    Click "Connect Facebook Page" in Integrations
+  </Step>
+  
+  <Step title="Grant Permissions">
+    Authorize all requested permissions for full functionality
+  </Step>
+  
+  <Step title="Select Page">
+    Choose which Facebook Page(s) to connect
+  </Step>
+  
+  <Step title="Start Posting">
+    Your page is now ready for scheduling posts
+  </Step>
+</Steps>
+
+### Required Permissions
+
+- `pages_show_list` - List your pages
+- `business_management` - Manage business assets
+- `pages_manage_posts` - Create and manage posts
+- `pages_manage_engagement` - Respond to comments
+- `pages_read_engagement` - Read engagement metrics
+- `read_insights` - Access page insights/analytics
+
+## Supported Features
+
+### Content Types
+
+<Tabs>
+  <Tab title="Text Posts">
+    - **Maximum**: 63,206 characters
+    - Rich text formatting not supported
+    - URLs automatically preview
+  </Tab>
+  
+  <Tab title="Photo Posts">
+    - Multiple photos supported
+    - Carousel format for multiple images
+    - Images published to album
+    - Max 4MB per photo (JPG/PNG)
+  </Tab>
+  
+  <Tab title="Video Posts">
+    - Single video per post
+    - MP4 format
+    - Posted as Facebook Reel
+    - URL: `https://www.facebook.com/reel/{video_id}`
+  </Tab>
+  
+  <Tab title="Link Posts">
+    - Share external URLs
+    - Automatic link preview
+    - Custom description supported
+  </Tab>
+</Tabs>
+
+### Post Settings
+
+<AccordionGroup>
+  <Accordion title="Link Sharing">
+    Add a URL to your post for link previews:
+    ```typescript
+    {
+      url: "https://example.com"
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Media Handling
+
+### Photo Upload Process
+
+<Steps>
+  <Step title="Upload Photos">
+    Photos are uploaded individually with `published: false`
+  </Step>
+  
+  <Step title="Create Post">
+    All uploaded photos are attached to the final post
+  </Step>
+  
+  <Step title="Publish">
+    Post is published with all media attached
+  </Step>
+</Steps>
+
+### Video Upload Process
+
+Videos are uploaded as Facebook Reels:
+- Direct upload from URL
+- Automatic Reel formatting
+- Permalink provided after upload
+
+<Info>
+  Facebook video posts are automatically formatted as Reels and linked to `facebook.com/reel/{id}`
+</Info>
+
+## Comments & Engagement
+
+Add comments to your Facebook posts:
+
+- Comment on posts and replies to comments
+- Support for media in comments
+- Threading supported
+- Max 63,206 characters per comment
+
+## Analytics
+
+### Page-Level Analytics
+
+Track key page metrics over time:
+
+- **Page Impressions**: Unique impressions
+- **Posts Impressions**: Post-specific impressions
+- **Post Engagement**: Likes, comments, shares
+- **Page Follows**: New followers
+- **Video Views**: Total video views
+
+### Post-Level Analytics
+
+Detailed metrics for individual posts:
+
+- **Impressions**: Unique reach
+- **Clicks**: Link and post clicks
+- **Reactions**: Total reactions by type (like, love, haha, etc.)
+- Real-time data updates
+
+<CodeGroup>
+```typescript Example Analytics Response
+{
+  "label": "Impressions",
+  "percentageChange": 0,
+  "data": [
+    {
+      "total": "1234",
+      "date": "2024-03-15"
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Rate Limits
+
+<Info>
+  **Rate Limits:**
+  - 100 concurrent posting jobs
+  - No strict daily post limit
+  - API rate limits apply per page
+</Info>
+
+## Error Handling
+
+Common Facebook API errors:
+
+| Error Code | Error | Solution |
+|------------|-------|----------|
+| 190 | Invalid access token | Reconnect your account |
+| 490 | Token expired | Reauthenticate |
+| 1366046 | Photo too large | Reduce file size under 4MB |
+| 1390008 | Posting too fast | Slow down posting frequency |
+| 1346003 | Abusive content | Content flagged - modify post |
+| 1404006 | Security check required | Complete Facebook security check |
+| 1404078 | Permission required | Reconnect with full permissions |
+| 1609008 | Cannot post Facebook links | Remove facebook.com URLs |
+
+<Warning>
+  **Content Policy**: Posts flagged as abusive (error 1346003) cannot be published. Review Facebook's Community Standards.
+</Warning>
+
+## Page Discovery
+
+Postiz discovers Facebook Pages through:
+
+1. **Direct OAuth Selection**: Pages you select during connection
+2. **Business Manager**: Pages managed through Business Manager
+3. **Owned Pages**: Pages you own
+4. **Client Pages**: Pages you manage for clients
+
+This ensures all accessible pages are available for posting.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Optimal Post Length">
+    Keep posts under 500 characters for best engagement
+  </Card>
+  
+  <Card title="Video Performance">
+    Native Facebook videos (Reels) get better reach than linked videos
+  </Card>
+  
+  <Card title="Image Specs">
+    Use 1200x630px for link previews, 1080x1080px for photo posts
+  </Card>
+  
+  <Card title="Posting Time">
+    Best engagement: 1 PM - 3 PM weekdays
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Token Validation Errors">
+    If you see "Error validating access token":
+    - Token may have expired (60-day expiry)
+    - Reconnect your Facebook account
+    - Ensure all permissions are granted
+    - Check Facebook session hasn't been invalidated
+  </Accordion>
+  
+  <Accordion title="Page Not Appearing">
+    If your page isn't showing:
+    - Verify you're an admin of the page
+    - Check Business Manager permissions
+    - Try disconnecting and reconnecting
+    - Ensure page isn't restricted
+  </Accordion>
+  
+  <Accordion title="Photo Upload Issues">
+    Photo upload problems:
+    - Reduce file size (under 4MB)
+    - Use JPG or PNG format
+    - Check image dimensions aren't excessive
+    - Verify account isn't rate limited
+  </Accordion>
+  
+  <Accordion title="Link Preview Not Working">
+    If link previews fail:
+    - Ensure URL is publicly accessible
+    - Check for proper Open Graph tags
+    - Facebook.com URLs cannot be shared
+    - Try using Facebook's Sharing Debugger
+  </Accordion>
+</AccordionGroup>

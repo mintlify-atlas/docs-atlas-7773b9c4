@@ -1,0 +1,645 @@
+---
+title: Code Standards and Conventions
+description: Code standards, conventions, and best practices for Postiz development
+---
+
+## Overview
+
+Postiz follows strict code standards to maintain consistency, readability, and quality across the codebase. These standards are enforced through ESLint, Prettier, and TypeScript.
+
+## General Principles
+
+### Language Requirements
+
+<Warning>
+**TypeScript is required** for all code. No JavaScript files except configuration.
+</Warning>
+
+```typescript
+// ✓ Correct - TypeScript with types
+interface User {
+  id: string;
+  email: string;
+  name: string;
+}
+
+function getUser(id: string): Promise<User> {
+  return fetch(`/api/users/${id}`);
+}
+
+// ✗ Wrong - No 'any' types
+function getUser(id: any): any {
+  return fetch(`/api/users/${id}`);
+}
+```
+
+### Package Manager
+
+<Warning>
+**Only use pnpm**. Never use npm or yarn.
+</Warning>
+
+```bash
+# ✓ Correct
+pnpm install package-name
+pnpm dev
+pnpm build
+
+# ✗ Wrong
+npm install package-name
+yarn add package-name
+```
+
+### Monorepo Structure
+
+- All dependencies in **root `package.json`**
+- Shared code in `libraries/`
+- Apps in `apps/`
+- No app-specific `node_modules`
+
+## Backend Standards
+
+### Architecture Layers
+
+<Note>
+**Strict 3-layer pattern**: Controller → Service → Repository
+
+Never skip layers. Sometimes 4 layers: Controller → Manager → Service → Repository
+</Note>
+
+```typescript
+// ✓ Correct - Following layers
+@Controller('/posts')
+export class PostsController {
+  constructor(private _postsService: PostsService) {}
+  
+  @Get()
+  async getPosts() {
+    return this._postsService.list();
+  }
+}
+
+@Injectable()
+export class PostsService {
+  constructor(private _postsRepository: PostsRepository) {}
+  
+  async list() {
+    return this._postsRepository.findMany();
+  }
+}
+
+// ✗ Wrong - Controller accessing repository directly
+@Controller('/posts')
+export class PostsController {
+  constructor(private _postsRepository: PostsRepository) {}  // Wrong!
+  
+  @Get()
+  async getPosts() {
+    return this._postsRepository.findMany();  // Skipping service layer!
+  }
+}
+```
+
+### Service Location
+
+<Info>
+Most server logic should be in `libraries/nestjs-libraries/src/services`, not in `apps/backend`.
+</Info>
+
+```
+✓ libraries/nestjs-libraries/src/services/email.service.ts
+✓ libraries/nestjs-libraries/src/services/stripe.service.ts
+
+✗ apps/backend/src/services/email.service.ts  # Wrong location
+```
+
+### Dependency Injection
+
+```typescript
+// ✓ Correct - Constructor injection with private keyword
+@Injectable()
+export class PostsService {
+  constructor(
+    private _postsRepository: PostsRepository,
+    private _usersService: UsersService,
+  ) {}
+}
+
+// ✗ Wrong - Manual instantiation
+@Injectable()
+export class PostsService {
+  private postsRepository = new PostsRepository();  // Wrong!
+}
+```
+
+### Naming Conventions
+
+```typescript
+// Services - private with underscore prefix
+private _userService: UserService
+private _db: DatabaseService
+
+// Methods - camelCase
+async getUserById(id: string) {}
+async createPost(data: CreatePostDto) {}
+
+// Classes - PascalCase
+export class PostsService {}
+export class AuthController {}
+
+// Interfaces - PascalCase with descriptive names
+interface CreatePostDto {}
+interface AuthTokenDetails {}
+```
+
+## Frontend Standards
+
+### Component Rules
+
+<Warning>
+**Critical Rules**:
+1. Never install UI components from npm
+2. Build custom components only
+3. Check existing components before creating new ones
+</Warning>
+
+```typescript
+// ✓ Correct - Custom component
+export function Button({ children, onClick }: ButtonProps) {
+  return (
+    <button className="bg-btnPrimary text-btnText px-4 py-2 rounded-lg">
+      {children}
+    </button>
+  );
+}
+
+// ✗ Wrong - Using external component library
+import { Button } from 'some-ui-library';  // Never do this!
+```
+
+### SWR Hook Rules
+
+<Warning>
+**Critical**: Each SWR hook must be in a separate function. Never use `eslint-disable-next-line` for hooks.
+</Warning>
+
+```typescript
+// ✓ Correct - Separate hooks
+const usePosts = () => {
+  const fetch = useFetch();
+  return useSWR('posts', () => fetch('/api/posts'));
+};
+
+const useUsers = () => {
+  const fetch = useFetch();
+  return useSWR('users', () => fetch('/api/users'));
+};
+
+// ✗ Wrong - Multiple hooks in one function
+const useData = () => {
+  return {
+    posts: () => useSWR('posts', getPosts),  // Wrong!
+    users: () => useSWR('users', getUsers),  // Wrong!
+  };
+};
+```
+
+### Fetch Hook Usage
+
+```typescript
+// ✓ Correct - Use custom fetch hook
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch.tsx';
+
+const fetch = useFetch();
+const data = await fetch('/api/endpoint');
+
+// ✗ Wrong - Using native fetch directly
+const data = await fetch('/api/endpoint');  // Don't use native fetch
+```
+
+### Color System
+
+<Warning>
+All `--color-custom*` variables are deprecated. Use new color system.
+</Warning>
+
+```tsx
+// ✓ Correct - New color variables
+<div className="bg-newBgColor text-newTextColor">
+  <button className="bg-btnPrimary text-btnText">Click</button>
+</div>
+
+// ✗ Wrong - Deprecated colors
+<div className="bg-customColor1 text-customColor2">  // Deprecated!
+```
+
+### Component File Structure
+
+```typescript ComponentName.tsx
+'use client';  // If client component
+
+import { ReactNode } from 'react';
+import clsx from 'clsx';
+
+// Types/Interfaces first
+interface ComponentNameProps {
+  children: ReactNode;
+  variant?: 'primary' | 'secondary';
+  className?: string;
+}
+
+// Component definition
+export function ComponentName({ 
+  children, 
+  variant = 'primary',
+  className 
+}: ComponentNameProps) {
+  return (
+    <div className={clsx('base-classes', className)}>
+      {children}
+    </div>
+  );
+}
+```
+
+## TypeScript Standards
+
+### Type Safety
+
+```typescript
+// ✓ Correct - Proper types
+interface User {
+  id: string;
+  email: string;
+  createdAt: Date;
+}
+
+function getUser(id: string): Promise<User> {
+  return db.user.findUnique({ where: { id } });
+}
+
+// ✗ Wrong - Using 'any'
+function getUser(id: any): any {  // Never use 'any'
+  return db.user.findUnique({ where: { id } });
+}
+```
+
+### Avoid Type Assertions
+
+```typescript
+// ✓ Correct - Type guards
+function isUser(obj: unknown): obj is User {
+  return typeof obj === 'object' && obj !== null && 'id' in obj;
+}
+
+if (isUser(data)) {
+  console.log(data.email);  // Type-safe
+}
+
+// ✗ Wrong - Type assertion
+const user = data as User;  // Avoid unless absolutely necessary
+```
+
+### Enums vs Union Types
+
+```typescript
+// ✓ Preferred - Union types
+type Status = 'draft' | 'published' | 'archived';
+
+// ✓ Also acceptable - Enums (when needed)
+enum Provider {
+  LOCAL = 'LOCAL',
+  GOOGLE = 'GOOGLE',
+  GITHUB = 'GITHUB',
+}
+```
+
+## Styling Standards
+
+### Tailwind CSS
+
+```typescript
+// ✓ Correct - Tailwind classes
+<div className="flex items-center justify-between p-6 bg-newBgColor">
+
+// ✓ Correct - With clsx for conditionals
+<div className={clsx(
+  'base-class',
+  { 'active-class': isActive },
+  customClass
+)} />
+
+// ✗ Wrong - Inline styles
+<div style={{ display: 'flex', padding: '24px' }}>  // Avoid inline styles
+```
+
+### SCSS Organization
+
+Before writing components, check:
+1. `/apps/frontend/src/app/colors.scss`
+2. `/apps/frontend/src/app/global.scss`
+3. `/apps/frontend/tailwind.config.js`
+
+## File Organization
+
+### Naming Conventions
+
+```
+Components:        Button.tsx, UserProfile.tsx (PascalCase)
+Services:          auth.service.ts, user.service.ts (kebab-case)
+Controllers:       auth.controller.ts (kebab-case)
+Utilities:         custom.fetch.tsx, timer.ts (kebab-case)
+Types:             user.types.ts, api.types.ts (kebab-case)
+```
+
+### Import Order
+
+```typescript
+// 1. External libraries
+import { Injectable } from '@nestjs/common';
+import { User } from '@prisma/client';
+
+// 2. Internal absolute imports
+import { AuthService } from '@gitroom/backend/services/auth/auth.service';
+import { DatabaseService } from '@gitroom/nestjs-libraries/database/database.service';
+
+// 3. Relative imports
+import { CreateUserDto } from './dto/create-user.dto';
+import { UserMapper } from './user.mapper';
+
+// 4. Type imports (if separated)
+import type { AuthResponse } from './types';
+```
+
+## Error Handling
+
+### Backend
+
+```typescript
+// ✓ Correct - Proper error handling
+try {
+  const user = await this._userService.create(dto);
+  return user;
+} catch (error) {
+  if (error instanceof ConflictException) {
+    throw error;
+  }
+  throw new InternalServerErrorException('Failed to create user');
+}
+
+// ✗ Wrong - Silent failures
+try {
+  const user = await this._userService.create(dto);
+  return user;
+} catch (error) {
+  // Empty catch - never do this!
+}
+```
+
+### Frontend
+
+```typescript
+// ✓ Correct - Error states
+const { data, error, isLoading } = useSWR('posts', fetchPosts);
+
+if (error) return <ErrorState error={error} />;
+if (isLoading) return <LoadingState />;
+return <PostsList posts={data} />;
+
+// ✗ Wrong - No error handling
+const { data } = useSWR('posts', fetchPosts);
+return <PostsList posts={data} />;  // What if data is undefined?
+```
+
+## Testing Standards
+
+### Test File Naming
+
+```
+auth.service.spec.ts       # Unit tests
+auth.controller.spec.ts    # Unit tests
+auth.e2e.spec.ts          # E2E tests
+```
+
+### Test Structure
+
+```typescript
+describe('AuthService', () => {
+  let service: AuthService;
+  let mockUserService: jest.Mocked<UserService>;
+  
+  beforeEach(async () => {
+    // Setup
+  });
+  
+  describe('register', () => {
+    it('should create a new user', async () => {
+      // Arrange
+      const dto = { email: 'test@example.com', password: 'password' };
+      
+      // Act
+      const result = await service.register(dto);
+      
+      // Assert
+      expect(result).toHaveProperty('jwt');
+    });
+    
+    it('should throw error if email exists', async () => {
+      // Test error case
+    });
+  });
+});
+```
+
+## Documentation Standards
+
+### Code Comments
+
+```typescript
+/**
+ * Authenticates a user via OAuth provider
+ * @param provider - OAuth provider name (google, github, etc.)
+ * @param code - Authorization code from OAuth callback
+ * @returns Authentication tokens and user information
+ * @throws {UnauthorizedException} If authentication fails
+ */
+async authenticate(
+  provider: string, 
+  code: string
+): Promise<AuthTokenDetails> {
+  // Implementation
+}
+```
+
+### JSDoc for Public APIs
+
+Use JSDoc for all public APIs and exported functions.
+
+## Linting and Formatting
+
+### Run Linting
+
+```bash
+# Lint all code (run from root only)
+pnpm lint
+
+# Fix auto-fixable issues
+pnpm lint --fix
+```
+
+<Note>
+Linting can **only** be run from the root directory.
+</Note>
+
+### ESLint Configuration
+
+Project uses:
+- `@typescript-eslint` for TypeScript
+- `eslint-plugin-react` for React
+- `eslint-plugin-react-hooks` for hooks rules
+- `eslint-config-prettier` for Prettier compatibility
+
+### Prettier
+
+Prettier auto-formats on save (if configured in your editor).
+
+## Git Commit Standards
+
+### Commit Message Format
+
+```bash
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation
+- `refactor`: Code refactoring
+- `test`: Tests
+- `chore`: Maintenance
+
+**Examples:**
+```bash
+feat(integrations): add Mastodon provider
+fix(calendar): resolve date rendering issue
+docs(api): update authentication guide
+refactor(auth): improve token refresh logic
+```
+
+## Security Standards
+
+### Environment Variables
+
+```typescript
+// ✓ Correct - Use environment variables
+const apiKey = process.env.API_KEY;
+
+// ✗ Wrong - Hardcoded secrets
+const apiKey = 'sk_live_123456';  // Never commit secrets!
+```
+
+### Input Validation
+
+```typescript
+// ✓ Correct - Validate with DTO
+import { IsEmail, IsString, MinLength } from 'class-validator';
+
+export class CreateUserDto {
+  @IsEmail()
+  email: string;
+  
+  @IsString()
+  @MinLength(8)
+  password: string;
+}
+
+// ✗ Wrong - No validation
+function createUser(email: string, password: string) {
+  // Direct database insert without validation
+}
+```
+
+## Performance Standards
+
+### Database Queries
+
+```typescript
+// ✓ Correct - Select only needed fields
+const user = await db.user.findUnique({
+  where: { id },
+  select: { id: true, email: true, name: true },
+});
+
+// ✗ Wrong - Fetching all fields and relations
+const user = await db.user.findUnique({
+  where: { id },
+  include: { posts: true, comments: true, ... },  // Expensive!
+});
+```
+
+### React Performance
+
+```typescript
+// ✓ Correct - Memoize expensive computations
+const sortedPosts = useMemo(
+  () => posts.sort((a, b) => b.createdAt - a.createdAt),
+  [posts]
+);
+
+// ✓ Correct - Memoize callbacks
+const handleClick = useCallback(() => {
+  doSomething();
+}, [dependency]);
+```
+
+## Best Practices Summary
+
+<Steps>
+  <Step title="Use TypeScript">
+    All code must be TypeScript. No `any` types.
+  </Step>
+  
+  <Step title="Follow architecture">
+    Backend: Controller → Service → Repository. Never skip layers.
+  </Step>
+  
+  <Step title="Build custom components">
+    Frontend: Never install UI components. Build custom.
+  </Step>
+  
+  <Step title="Separate SWR hooks">
+    Each SWR hook in its own function. No exceptions.
+  </Step>
+  
+  <Step title="Use pnpm only">
+    Never use npm or yarn. Only pnpm.
+  </Step>
+  
+  <Step title="Test your code">
+    Write tests for new features and bug fixes.
+  </Step>
+  
+  <Step title="Document public APIs">
+    Use JSDoc for exported functions and classes.
+  </Step>
+  
+  <Step title="Run linting">
+    Always run `pnpm lint` before committing.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Testing Strategy" icon="flask" href="/development/testing">
+    Learn testing best practices
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="/development/contributing">
+    Start contributing to Postiz
+  </Card>
+</CardGroup>

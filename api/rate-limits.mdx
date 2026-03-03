@@ -1,0 +1,224 @@
+---
+title: 'Rate Limits'
+description: 'Understanding API rate limits and best practices'
+---
+
+## Overview
+
+To ensure fair usage and maintain service quality, the Postiz API implements rate limiting on all public endpoints.
+
+## Default Limits
+
+The default rate limit is:
+
+<Card title="30 requests per hour" icon="gauge">
+  Rate limits are calculated per API key on a rolling one-hour window
+</Card>
+
+### Technical Details
+
+- **Window**: 3,600,000 milliseconds (1 hour)
+- **Limit**: 30 requests per window
+- **Scope**: Per API key
+- **Storage**: Redis-backed for distributed systems
+
+## Custom Limits
+
+Self-hosted instances can configure custom rate limits using the `API_LIMIT` environment variable:
+
+```bash
+# Set custom rate limit (e.g., 100 requests per hour)
+API_LIMIT=100
+```
+
+Cloud customers on higher-tier plans may have increased rate limits. Contact support for custom limits.
+
+## Rate Limit Headers
+
+The API includes rate limit information in response headers:
+
+```
+X-RateLimit-Limit: 30
+X-RateLimit-Remaining: 25
+X-RateLimit-Reset: 1640995200
+```
+
+<ResponseField name="X-RateLimit-Limit" type="integer">
+  Maximum number of requests allowed in the current window
+</ResponseField>
+
+<ResponseField name="X-RateLimit-Remaining" type="integer">
+  Number of requests remaining in the current window
+</ResponseField>
+
+<ResponseField name="X-RateLimit-Reset" type="integer">
+  Unix timestamp when the rate limit resets
+</ResponseField>
+
+## Rate Limit Exceeded
+
+When you exceed the rate limit, you'll receive a `429 Too Many Requests` response:
+
+```json
+{
+  "statusCode": 429,
+  "message": "ThrottlerException: Too Many Requests"
+}
+```
+
+### Handling Rate Limits
+
+Implement exponential backoff when you hit rate limits:
+
+<CodeGroup>
+
+```javascript Node.js
+async function makeRequestWithRetry(url, options, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    const response = await fetch(url, options);
+    
+    if (response.status === 429) {
+      const resetTime = response.headers.get('X-RateLimit-Reset');
+      const waitTime = resetTime 
+        ? (parseInt(resetTime) * 1000) - Date.now()
+        : Math.pow(2, i) * 1000; // Exponential backoff
+      
+      console.log(`Rate limited. Waiting ${waitTime}ms...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      continue;
+    }
+    
+    return response;
+  }
+  
+  throw new Error('Max retries exceeded');
+}
+```
+
+```python Python
+import time
+import requests
+
+def make_request_with_retry(url, headers, max_retries=3):
+    for i in range(max_retries):
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 429:
+            reset_time = response.headers.get('X-RateLimit-Reset')
+            
+            if reset_time:
+                wait_time = int(reset_time) - int(time.time())
+            else:
+                wait_time = 2 ** i  # Exponential backoff
+            
+            print(f'Rate limited. Waiting {wait_time}s...')
+            time.sleep(wait_time)
+            continue
+        
+        return response
+    
+    raise Exception('Max retries exceeded')
+```
+
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Cache Responses">
+    Cache API responses when possible to reduce the number of requests. For example, integration lists rarely change.
+  </Accordion>
+  
+  <Accordion title="Batch Operations">
+    Use batch endpoints when available. The posts creation endpoint accepts multiple integrations in a single request.
+  </Accordion>
+  
+  <Accordion title="Monitor Headers">
+    Always check rate limit headers and adjust your request rate proactively before hitting limits.
+  </Accordion>
+  
+  <Accordion title="Use Webhooks">
+    For real-time updates, consider using webhooks instead of polling the API repeatedly.
+  </Accordion>
+  
+  <Accordion title="Implement Queuing">
+    Use a queue system to manage API requests and prevent bursts that exceed rate limits.
+  </Accordion>
+</AccordionGroup>
+
+## Rate Limit by Endpoint
+
+Rate limits apply globally across all endpoints. Each API call counts toward your hourly limit, regardless of the endpoint.
+
+### Request Cost
+
+All endpoints have the same cost:
+
+| Endpoint | Cost |
+|----------|------|
+| GET /integrations | 1 request |
+| GET /posts | 1 request |
+| POST /posts | 1 request |
+| POST /upload | 1 request |
+| DELETE /posts/:id | 1 request |
+
+## Monitoring Usage
+
+### Track Your Usage
+
+Implement client-side tracking to monitor your API usage:
+
+```javascript
+class RateLimitTracker {
+  constructor() {
+    this.remaining = null;
+    this.limit = null;
+    this.resetTime = null;
+  }
+  
+  updateFromHeaders(headers) {
+    this.limit = parseInt(headers.get('X-RateLimit-Limit'));
+    this.remaining = parseInt(headers.get('X-RateLimit-Remaining'));
+    this.resetTime = parseInt(headers.get('X-RateLimit-Reset'));
+  }
+  
+  canMakeRequest() {
+    if (this.remaining === null) return true;
+    return this.remaining > 0;
+  }
+  
+  timeUntilReset() {
+    if (!this.resetTime) return 0;
+    return Math.max(0, this.resetTime * 1000 - Date.now());
+  }
+}
+```
+
+## Increasing Limits
+
+Need higher rate limits? Here are your options:
+
+<Steps>
+  <Step title="Upgrade Your Plan">
+    Cloud customers can upgrade to higher-tier plans with increased rate limits.
+  </Step>
+  
+  <Step title="Self-Host">
+    Self-hosted instances can configure custom rate limits using environment variables.
+  </Step>
+  
+  <Step title="Contact Support">
+    Enterprise customers can request custom rate limits tailored to their needs.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Create Post" icon="paper-plane" href="/api/posts/create-post">
+    Start making API requests
+  </Card>
+  <Card title="List Integrations" icon="plug" href="/api/integrations/list-integrations">
+    Fetch your connected accounts
+  </Card>
+</CardGroup>

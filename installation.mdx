@@ -1,0 +1,806 @@
+---
+title: "Installation Guide"
+description: "Self-host Postiz on your own infrastructure with Docker Compose in under 15 minutes"
+---
+
+## Overview
+
+This guide covers self-hosting Postiz using Docker Compose. The self-hosted version has **no feature limitations** compared to the cloud version—you get the complete platform with full control over your data.
+
+<Info>
+  **Prefer cloud hosting?** Sign up at [platform.postiz.com](https://platform.postiz.com) for instant access with zero setup.
+</Info>
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+<CardGroup cols={2}>
+  <Card title="Docker & Docker Compose" icon="docker">
+    Docker Engine 20.10+ and Docker Compose v2.0+
+    
+    [Install Docker](https://docs.docker.com/get-docker/)
+  </Card>
+
+  <Card title="System Requirements" icon="server">
+    **Minimum:**
+    - 2 CPU cores
+    - 4GB RAM
+    - 20GB disk space
+    
+    **Recommended:**
+    - 4 CPU cores
+    - 8GB RAM
+    - 50GB SSD storage
+  </Card>
+
+  <Card title="Domain & DNS" icon="globe">
+    A domain name with DNS configured (for production)
+    
+    Optional for local testing
+  </Card>
+
+  <Card title="Platform Credentials" icon="key">
+    OAuth credentials for platforms you want to connect
+    
+    See [platform setup section](#configure-social-platform-credentials)
+  </Card>
+</CardGroup>
+
+## Quick Installation
+
+Get Postiz running in 3 commands:
+
+<Steps>
+  <Step title="Clone the Repository">
+    ```bash
+    git clone https://github.com/gitroomhq/postiz-app.git
+    cd postiz-app
+    ```
+  </Step>
+
+  <Step title="Configure Environment">
+    Copy the example environment file and update required settings:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Edit `.env` with your preferred editor:
+
+    ```bash
+    nano .env
+    ```
+
+    **Minimum Required Configuration:**
+
+    ```bash .env
+    # Database (auto-configured by Docker)
+    DATABASE_URL="postgresql://postiz-user:postiz-password@postiz-postgres:5432/postiz-db-local"
+    REDIS_URL="redis://postiz-redis:6379"
+
+    # JWT Secret - CHANGE THIS to a random string!
+    JWT_SECRET="your-super-secret-random-string-min-32-chars"
+
+    # URLs - Update these for your domain
+    MAIN_URL="http://localhost:4007"
+    FRONTEND_URL="http://localhost:4007"
+    NEXT_PUBLIC_BACKEND_URL="http://localhost:4007/api"
+    BACKEND_INTERNAL_URL="http://localhost:3000"
+
+    # Temporal (auto-configured)
+    TEMPORAL_ADDRESS="temporal:7233"
+
+    # Required flags
+    IS_GENERAL="true"
+    DISABLE_REGISTRATION="false"
+
+    # Storage - local or cloudflare
+    STORAGE_PROVIDER="local"
+    UPLOAD_DIRECTORY="/uploads"
+    NEXT_PUBLIC_UPLOAD_DIRECTORY="/uploads"
+    ```
+
+    <Warning>
+      **Security:** Change `JWT_SECRET` to a unique random string. Use at least 32 characters for production deployments.
+    </Warning>
+  </Step>
+
+  <Step title="Launch Postiz">
+    Start all services with Docker Compose:
+
+    ```bash
+    docker compose up -d
+    ```
+
+    This will start:
+    - **postiz** - Main application (port 4007)
+    - **postiz-postgres** - PostgreSQL database
+    - **postiz-redis** - Redis cache
+    - **temporal** - Workflow orchestrator
+    - **temporal-postgresql** - Temporal database
+    - **temporal-elasticsearch** - Temporal search
+    - **temporal-ui** - Temporal dashboard (port 8080)
+
+    <Info>
+      First launch takes 3-5 minutes to download images and initialize databases.
+    </Info>
+
+    **Check service status:**
+
+    ```bash
+    docker compose ps
+    ```
+
+    All services should show `running` status.
+  </Step>
+</Steps>
+
+## Access Postiz
+
+Once all services are running:
+
+<CardGroup cols={2}>
+  <Card title="Main Application" icon="browser">
+    **URL:** http://localhost:4007
+    
+    Your Postiz dashboard and UI
+  </Card>
+
+  <Card title="Temporal UI" icon="diagram-project">
+    **URL:** http://localhost:8080
+    
+    Monitor background jobs and workflows
+  </Card>
+</CardGroup>
+
+<Steps>
+  <Step title="Open Postiz">
+    Navigate to http://localhost:4007 in your browser
+  </Step>
+
+  <Step title="Create Admin Account">
+    On first visit, you'll see the registration page:
+
+    - Enter your name
+    - Email address
+    - Password (min 8 characters)
+    - Click **Create Account**
+
+    <Note>
+      If `RESEND_API_KEY` is not configured, your account is immediately active. Otherwise, check your email for verification.
+    </Note>
+  </Step>
+
+  <Step title="Login & Start">
+    Log in with your credentials and start scheduling posts!
+  </Step>
+</Steps>
+
+## Configure Social Platform Credentials
+
+To connect social platforms, you need OAuth credentials from each platform's developer portal. Add these to your `.env` file:
+
+<AccordionGroup>
+  <Accordion title="X (Twitter)" icon="x-twitter">
+    **Developer Portal:** https://developer.twitter.com/en/portal/dashboard
+
+    **Required Permissions:**
+    - Read and write tweets
+    - Read user profile
+
+    **Callback URL:**
+    ```
+    http://localhost:4007/integrations/social/x
+    ```
+
+    **Environment Variables:**
+    ```bash
+    X_API_KEY="your_consumer_key"
+    X_API_SECRET="your_consumer_secret"
+    ```
+  </Accordion>
+
+  <Accordion title="LinkedIn (Personal)" icon="linkedin">
+    **Developer Portal:** https://www.linkedin.com/developers/
+
+    **Required Products:**
+    - Share on LinkedIn
+    - Sign In with LinkedIn
+
+    **Callback URL:**
+    ```
+    http://localhost:4007/integrations/social/linkedin
+    ```
+
+    **Environment Variables:**
+    ```bash
+    LINKEDIN_CLIENT_ID="your_client_id"
+    LINKEDIN_CLIENT_SECRET="your_client_secret"
+    ```
+  </Accordion>
+
+  <Accordion title="Facebook & Instagram" icon="meta">
+    **Developer Portal:** https://developers.facebook.com/
+
+    **Required Products:**
+    - Facebook Login
+    - Instagram Basic Display
+    - Instagram Graph API (for business accounts)
+
+    **Callback URL:**
+    ```
+    http://localhost:4007/integrations/social/facebook
+    ```
+
+    **Environment Variables:**
+    ```bash
+    FACEBOOK_APP_ID="your_app_id"
+    FACEBOOK_APP_SECRET="your_app_secret"
+    ```
+
+    <Warning>
+      Instagram posting requires a Facebook Business Page connected to your Instagram account.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="YouTube" icon="youtube">
+    **Developer Portal:** https://console.cloud.google.com/
+
+    **Required APIs:**
+    - YouTube Data API v3
+
+    **Callback URL:**
+    ```
+    http://localhost:4007/integrations/social/youtube
+    ```
+
+    **Environment Variables:**
+    ```bash
+    YOUTUBE_CLIENT_ID="your_google_client_id"
+    YOUTUBE_CLIENT_SECRET="your_google_client_secret"
+    ```
+  </Accordion>
+
+  <Accordion title="TikTok" icon="tiktok">
+    **Developer Portal:** https://developers.tiktok.com/
+
+    **Required Permissions:**
+    - Video upload
+    - User info
+
+    **Callback URL:**
+    ```
+    http://localhost:4007/integrations/social/tiktok
+    ```
+
+    **Environment Variables:**
+    ```bash
+    TIKTOK_CLIENT_ID="your_client_key"
+    TIKTOK_CLIENT_SECRET="your_client_secret"
+    ```
+  </Accordion>
+
+  <Accordion title="Reddit" icon="reddit">
+    **Developer Portal:** https://www.reddit.com/prefs/apps
+
+    **App Type:** Web App
+
+    **Callback URL:**
+    ```
+    http://localhost:4007/integrations/social/reddit
+    ```
+
+    **Environment Variables:**
+    ```bash
+    REDDIT_CLIENT_ID="your_client_id"
+    REDDIT_CLIENT_SECRET="your_client_secret"
+    ```
+  </Accordion>
+
+  <Accordion title="Discord" icon="discord">
+    **Developer Portal:** https://discord.com/developers/applications
+
+    **Required Scopes:**
+    - bot
+    - applications.commands
+    - Send Messages
+
+    **Callback URL:**
+    ```
+    http://localhost:4007/integrations/social/discord
+    ```
+
+    **Environment Variables:**
+    ```bash
+    DISCORD_CLIENT_ID="your_application_id"
+    DISCORD_CLIENT_SECRET="your_client_secret"
+    DISCORD_BOT_TOKEN_ID="your_bot_token"
+    ```
+  </Accordion>
+
+  <Accordion title="Slack" icon="slack">
+    **Developer Portal:** https://api.slack.com/apps
+
+    **Required Scopes:**
+    - channels:read
+    - chat:write
+    - users:read
+    - groups:read
+    - channels:join
+
+    **Callback URL:**
+    ```
+    http://localhost:4007/integrations/social/slack
+    ```
+
+    **Environment Variables:**
+    ```bash
+    SLACK_ID="your_client_id"
+    SLACK_SECRET="your_client_secret"
+    SLACK_SIGNING_SECRET="your_signing_secret"
+    ```
+  </Accordion>
+
+  <Accordion title="Threads" icon="threads">
+    **Developer Portal:** https://developers.facebook.com/
+
+    **Note:** Threads uses Meta's developer platform
+
+    **Callback URL:**
+    ```
+    http://localhost:4007/integrations/social/threads
+    ```
+
+    **Environment Variables:**
+    ```bash
+    THREADS_APP_ID="your_app_id"
+    THREADS_APP_SECRET="your_app_secret"
+    ```
+  </Accordion>
+
+  <Accordion title="Pinterest" icon="pinterest">
+    **Developer Portal:** https://developers.pinterest.com/
+
+    **Required Scopes:**
+    - boards:read
+    - pins:read
+    - pins:write
+
+    **Callback URL:**
+    ```
+    http://localhost:4007/integrations/social/pinterest
+    ```
+
+    **Environment Variables:**
+    ```bash
+    PINTEREST_CLIENT_ID="your_app_id"
+    PINTEREST_CLIENT_SECRET="your_app_secret"
+    ```
+  </Accordion>
+
+  <Accordion title="Mastodon" icon="mastodon">
+    **Setup:** No developer account needed - instance-level OAuth
+
+    **Default Instance:** https://mastodon.social (configurable)
+
+    **Environment Variables:**
+    ```bash
+    MASTODON_URL="https://mastodon.social"
+    MASTODON_CLIENT_ID="auto_generated_on_connect"
+    MASTODON_CLIENT_SECRET="auto_generated_on_connect"
+    ```
+
+    <Info>
+      Mastodon credentials are generated when you first connect. You can connect to any Mastodon instance.
+    </Info>
+  </Accordion>
+</AccordionGroup>
+
+**All Supported Platforms:**
+
+Below is the complete list from `integration.manager.ts:40-74`:
+
+- X (Twitter)
+- LinkedIn (Personal & Pages)
+- Reddit
+- Instagram (Business & Standalone)
+- Facebook
+- Threads
+- YouTube
+- Google My Business
+- TikTok
+- Pinterest
+- Dribbble
+- Discord
+- Slack
+- Kick
+- Twitch
+- Mastodon
+- Bluesky
+- Lemmy
+- Farcaster
+- Telegram
+- Nostr
+- VK
+- Medium
+- Dev.to
+- Hashnode
+- WordPress
+- Listmonk
+- Moltbook
+- Whop
+- Skool
+
+<Tip>
+  You don't need credentials for all platforms—only configure the ones you plan to use.
+</Tip>
+
+## Optional Configuration
+
+### AI Content Generation
+
+Enable AI-powered content creation with OpenAI:
+
+```bash .env
+OPENAI_API_KEY="sk-your-openai-api-key"
+```
+
+**AI Features:**
+- Generate engaging posts from prompts
+- Create thread content automatically
+- Optimize post length for platforms
+- Convert text to natural voice
+
+### Email Notifications
+
+Configure Resend for user email verification and notifications:
+
+```bash .env
+RESEND_API_KEY="re_your-resend-api-key"
+EMAIL_FROM_ADDRESS="noreply@yourdomain.com"
+EMAIL_FROM_NAME="Postiz"
+```
+
+<Note>
+  If `RESEND_API_KEY` is not set, users are auto-activated without email verification.
+</Note>
+
+### Cloudflare R2 Storage
+
+For production, use Cloudflare R2 instead of local storage:
+
+```bash .env
+STORAGE_PROVIDER="cloudflare"
+CLOUDFLARE_ACCOUNT_ID="your-account-id"
+CLOUDFLARE_ACCESS_KEY="your-access-key"
+CLOUDFLARE_SECRET_ACCESS_KEY="your-secret-access-key"
+CLOUDFLARE_BUCKETNAME="postiz-uploads"
+CLOUDFLARE_BUCKET_URL="https://your-bucket.r2.cloudflarestorage.com/"
+CLOUDFLARE_REGION="auto"
+```
+
+### Stripe Payments (Optional)
+
+If you want to offer paid plans:
+
+```bash .env
+STRIPE_PUBLISHABLE_KEY="pk_your_publishable_key"
+STRIPE_SECRET_KEY="sk_your_secret_key"
+STRIPE_SIGNING_KEY="whsec_your_webhook_secret"
+FEE_AMOUNT=0.05
+```
+
+### Disable Registration
+
+For private instances, disable new user signups:
+
+```bash .env
+DISABLE_REGISTRATION="true"
+```
+
+### API Rate Limiting
+
+Configure public API rate limits (requests per hour):
+
+```bash .env
+API_LIMIT=30
+```
+
+## Production Deployment
+
+For production environments, follow these additional steps:
+
+<Steps>
+  <Step title="Use a Reverse Proxy">
+    Set up Nginx or Caddy to handle SSL/TLS:
+
+    **Nginx Example:**
+    ```nginx
+    server {
+        listen 443 ssl http2;
+        server_name postiz.yourdomain.com;
+
+        ssl_certificate /path/to/cert.pem;
+        ssl_certificate_key /path/to/key.pem;
+
+        location / {
+            proxy_pass http://localhost:4007;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_cache_bypass $http_upgrade;
+        }
+    }
+    ```
+
+    **Update your .env:**
+    ```bash
+    MAIN_URL="https://postiz.yourdomain.com"
+    FRONTEND_URL="https://postiz.yourdomain.com"
+    NEXT_PUBLIC_BACKEND_URL="https://postiz.yourdomain.com/api"
+    ```
+  </Step>
+
+  <Step title="Update OAuth Callbacks">
+    Update all platform OAuth redirect URIs from `http://localhost:4007` to your production domain:
+
+    ```
+    https://postiz.yourdomain.com/integrations/social/{platform}
+    ```
+
+    This must be done in each platform's developer console.
+  </Step>
+
+  <Step title="Configure Cloudflare R2">
+    Switch from local storage to Cloudflare R2 for scalability:
+
+    ```bash
+    STORAGE_PROVIDER="cloudflare"
+    # Add Cloudflare credentials as shown above
+    ```
+  </Step>
+
+  <Step title="Set Up Backups">
+    Backup PostgreSQL database regularly:
+
+    ```bash
+    # Manual backup
+    docker compose exec postiz-postgres pg_dump -U postiz-user postiz-db-local > backup.sql
+
+    # Restore
+    docker compose exec -T postiz-postgres psql -U postiz-user postiz-db-local < backup.sql
+    ```
+
+    Consider automated backups with cron or cloud backup services.
+  </Step>
+
+  <Step title="Monitor Services">
+    Access Temporal UI to monitor workflow execution:
+
+    ```
+    https://postiz.yourdomain.com:8080
+    ```
+
+    Set up log aggregation with:
+    ```bash
+    docker compose logs -f
+    ```
+  </Step>
+</Steps>
+
+## Updating Postiz
+
+To update to the latest version:
+
+```bash
+# Pull latest changes
+git pull origin main
+
+# Pull latest Docker images
+docker compose pull
+
+# Restart services
+docker compose up -d
+
+# Check everything is running
+docker compose ps
+```
+
+<Warning>
+  Always backup your database before updating!
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Services won't start">
+    **Check Docker status:**
+    ```bash
+    docker compose ps
+    docker compose logs
+    ```
+
+    **Common fixes:**
+    - Ensure ports 4007, 8080, 7233 are not in use
+    - Check Docker has enough memory (4GB minimum)
+    - Verify `.env` file exists and is properly formatted
+  </Accordion>
+
+  <Accordion title="Database connection errors">
+    **Error:** `Error: connect ECONNREFUSED`
+
+    **Solution:** Wait for PostgreSQL to initialize:
+    ```bash
+    docker compose logs postiz-postgres
+    ```
+
+    Look for "database system is ready to accept connections"
+
+    Restart Postiz service:
+    ```bash
+    docker compose restart postiz
+    ```
+  </Accordion>
+
+  <Accordion title="OAuth redirect errors">
+    **Error:** Redirect URI mismatch
+
+    **Solution:** Ensure callback URLs match exactly:
+
+    1. Check your `.env` `FRONTEND_URL`
+    2. Verify platform developer console callback URLs
+    3. Format: `{FRONTEND_URL}/integrations/social/{platform}`
+    4. No trailing slashes
+  </Accordion>
+
+  <Accordion title="Posts not publishing">
+    **Problem:** Scheduled posts remain in queue
+
+    **Solution:** Check Temporal services:
+    ```bash
+    docker compose logs temporal
+    docker compose logs orchestrator
+    ```
+
+    Ensure Temporal UI shows workflows executing:
+    ```
+    http://localhost:8080
+    ```
+
+    Restart orchestrator if needed:
+    ```bash
+    docker compose restart postiz
+    ```
+  </Accordion>
+
+  <Accordion title="High memory usage">
+    **Problem:** Docker consuming too much RAM
+
+    **Solution:** Limit container resources in `docker-compose.yaml`:
+
+    ```yaml
+    services:
+      postiz:
+        deploy:
+          resources:
+            limits:
+              memory: 2G
+    ```
+
+    Or disable Elasticsearch for Temporal (uses less memory):
+    ```yaml
+    # Comment out temporal-elasticsearch service
+    ```
+  </Accordion>
+
+  <Accordion title="File upload failures">
+    **Problem:** Cannot upload media files
+
+    **Solution:** Check storage configuration:
+
+    **Local storage:**
+    ```bash
+    # Verify volume permissions
+    docker compose exec postiz ls -la /uploads
+    ```
+
+    **Cloudflare R2:**
+    - Verify credentials are correct
+    - Check bucket permissions
+    - Test connectivity to R2 endpoint
+  </Accordion>
+</AccordionGroup>
+
+## Development Setup
+
+For local development without Docker:
+
+<Steps>
+  <Step title="Install Dependencies">
+    **Requirements:**
+    - Node.js 22.12.0+
+    - pnpm 10.6.1+
+    - PostgreSQL 17
+    - Redis 7.2
+
+    ```bash
+    # Install pnpm
+    npm install -g pnpm@10.6.1
+
+    # Install dependencies
+    pnpm install
+    ```
+  </Step>
+
+  <Step title="Start Infrastructure">
+    Use Docker for databases only:
+
+    ```bash
+    docker compose -f docker-compose.dev.yaml up -d
+    ```
+
+    This starts PostgreSQL, Redis, and Temporal.
+  </Step>
+
+  <Step title="Run Database Migrations">
+    ```bash
+    pnpm prisma-db-push
+    ```
+  </Step>
+
+  <Step title="Start Development Servers">
+    ```bash
+    # Start all apps (frontend, backend, orchestrator)
+    pnpm dev
+
+    # Or start individually:
+    pnpm dev:frontend   # http://localhost:4200
+    pnpm dev:backend    # http://localhost:3000
+    pnpm dev:orchestrator
+    ```
+  </Step>
+</Steps>
+
+**Project Structure:**
+
+```
+postiz-app/
+├── apps/
+│   ├── frontend/        # Next.js 14 app (port 4200)
+│   ├── backend/         # NestJS API (port 3000)
+│   ├── orchestrator/    # Temporal workflows
+│   └── cli/             # Postiz CLI tool
+├── libraries/
+│   ├── nestjs-libraries/  # Shared backend code
+│   │   └── integrations/  # Platform providers
+│   └── helpers/          # Utility functions
+├── docker-compose.yaml   # Production setup
+├── docker-compose.dev.yaml  # Dev infrastructure
+└── .env                  # Configuration
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Learn how to create your first scheduled post
+  </Card>
+
+  <Card title="Configuration Reference" icon="gear" href="/configuration/oauth-apps">
+    Explore all configuration options
+  </Card>
+
+  <Card title="Public API" icon="code" href="/api/overview">
+    Integrate Postiz with external tools
+  </Card>
+
+  <Card title="GitHub" icon="github" href="https://github.com/gitroomhq/postiz-app">
+    Contribute to the project
+  </Card>
+</CardGroup>
+
+<Note>
+  **Need help?** Join our [Discord community](https://discord.postiz.com) or open an issue on [GitHub](https://github.com/gitroomhq/postiz-app/issues).
+</Note>

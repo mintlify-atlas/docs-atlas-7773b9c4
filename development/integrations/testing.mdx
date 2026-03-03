@@ -1,0 +1,488 @@
+---
+title: Testing Integrations
+description: Testing strategies for social media integrations in Postiz
+---
+
+## Overview
+
+Testing social media integrations requires careful attention to OAuth flows, API rate limits, and platform-specific behaviors. This guide covers strategies for testing providers effectively.
+
+## Testing Strategy
+
+### Test Pyramid
+
+```
+        E2E Tests
+      (OAuth + Posting)
+    ┌──────────────┐
+    │              │
+    └──────────────┘
+    
+   Integration Tests
+ (Provider Methods)
+┌──────────────────────┐
+│                      │
+└──────────────────────┘
+
+     Unit Tests
+(Individual Functions)
+┌──────────────────────────────┐
+│                              │
+└──────────────────────────────┘
+```
+
+## Unit Tests
+
+### Testing OAuth URL Generation
+
+```typescript example.provider.spec.ts
+import { Test } from '@nestjs/testing';
+import { ExampleProvider } from './example.provider';
+
+describe('ExampleProvider', () => {
+  let provider: ExampleProvider;
+  
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [ExampleProvider],
+    }).compile();
+    
+    provider = module.get<ExampleProvider>(ExampleProvider);
+  });
+  
+  describe('generateAuthUrl', () => {
+    it('should generate valid OAuth URL', async () => {
+      const result = await provider.generateAuthUrl();
+      
+      expect(result.url).toContain('https://example.com/oauth');
+      expect(result.url).toContain('client_id=');
+      expect(result.url).toContain('redirect_uri=');
+      expect(result.state).toHaveLength(6);
+    });
+    
+    it('should include all required scopes', async () => {
+      const result = await provider.generateAuthUrl();
+      const url = new URL(result.url);
+      const scope = url.searchParams.get('scope');
+      
+      expect(scope).toContain('read');
+      expect(scope).toContain('write');
+    });
+  });
+});
+```
+
+### Testing Error Handling
+
+```typescript
+describe('handleErrors', () => {
+  it('should detect expired token', () => {
+    const error = '{"error":"invalid_token","message":"Token expired"}';
+    const result = provider.handleErrors(error);
+    
+    expect(result).toEqual({
+      type: 'refresh-token',
+      value: expect.stringContaining('expired'),
+    });
+  });
+  
+  it('should detect rate limiting', () => {
+    const error = '{"error":"rate_limit_exceeded"}';
+    const result = provider.handleErrors(error);
+    
+    expect(result).toEqual({
+      type: 'retry',
+      value: expect.stringContaining('rate limit'),
+    });
+  });
+  
+  it('should return undefined for unknown errors', () => {
+    const error = '{"error":"unknown_error"}';
+    const result = provider.handleErrors(error);
+    
+    expect(result).toBeUndefined();
+  });
+});
+```
+
+## Integration Tests
+
+### Mocking Platform APIs
+
+```typescript
+import { rest } from 'msw';
+import { setupServer } from 'msw/node';
+
+const server = setupServer(
+  // Mock token endpoint
+  rest.post('https://example.com/oauth/token', (req, res, ctx) => {
+    return res(
+      ctx.json({
+        access_token: 'mock_access_token',
+        refresh_token: 'mock_refresh_token',
+        expires_in: 3600,
+        scope: 'read write',
+      })
+    );
+  }),
+  
+  // Mock user profile endpoint
+  rest.get('https://api.example.com/v1/me', (req, res, ctx) => {
+    const auth = req.headers.get('Authorization');
+    
+    if (!auth || !auth.includes('Bearer')) {
+      return res(ctx.status(401), ctx.json({ error: 'unauthorized' }));
+    }
+    
+    return res(
+      ctx.json({
+        id: '12345',
+        name: 'Test User',
+        username: 'testuser',
+        picture: 'https://example.com/avatar.jpg',
+      })
+    );
+  })
+);
+
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+```
+
+### Testing Authentication Flow
+
+```typescript
+describe('authenticate', () => {
+  it('should exchange code for token', async () => {
+    const result = await provider.authenticate({
+      code: 'test_code',
+      codeVerifier: 'test_verifier',
+    });
+    
+    expect(result).toMatchObject({
+      id: '12345',
+      name: 'Test User',
+      accessToken: 'mock_access_token',
+      refreshToken: 'mock_refresh_token',
+      expiresIn: 3600,
+    });
+  });
+  
+  it('should throw on invalid code', async () => {
+    server.use(
+      rest.post('https://example.com/oauth/token', (req, res, ctx) => {
+        return res(
+          ctx.status(400),
+          ctx.json({ error: 'invalid_grant' })
+        );
+      })
+    );
+    
+    await expect(
+      provider.authenticate({ code: 'invalid', codeVerifier: '' })
+    ).rejects.toThrow();
+  });
+});
+```
+
+### Testing Post Publishing
+
+```typescript
+describe('post', () => {
+  const mockIntegration = {
+    id: 'int_123',
+    token: 'mock_token',
+    internalId: 'user_123',
+  } as Integration;
+  
+  beforeEach(() => {
+    server.use(
+      rest.post('https://api.example.com/v1/posts', (req, res, ctx) => {
+        return res(
+          ctx.json({
+            id: 'post_123',
+            url: 'https://example.com/posts/post_123',
+          })
+        );
+      })
+    );
+  });
+  
+  it('should publish a text post', async () => {
+    const result = await provider.post(
+      {
+        posts: [
+          {
+            content: 'Test post content',
+            media: [],
+          },
+        ],
+      },
+      mockIntegration
+    );
+    
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      postId: 'post_123',
+      releaseURL: expect.stringContaining('post_123'),
+      status: 'success',
+    });
+  });
+  
+  it('should handle posting errors', async () => {
+    server.use(
+      rest.post('https://api.example.com/v1/posts', (req, res, ctx) => {
+        return res(
+          ctx.status(403),
+          ctx.json({ error: 'forbidden' })
+        );
+      })
+    );
+    
+    const result = await provider.post(
+      {
+        posts: [{ content: 'Test', media: [] }],
+      },
+      mockIntegration
+    );
+    
+    expect(result[0].status).toBe('failed');
+    expect(result[0].error).toBeDefined();
+  });
+});
+```
+
+## Manual Testing
+
+### OAuth Flow Testing
+
+<Steps>
+  <Step title="Create test account">
+    Create a test account on the platform for testing OAuth flow.
+  </Step>
+  
+  <Step title="Test authorization">
+    Click "Connect" in Postiz UI and verify redirect to platform.
+  </Step>
+  
+  <Step title="Grant permissions">
+    Authorize the app and verify all requested scopes are shown.
+  </Step>
+  
+  <Step title="Verify callback">
+    Confirm successful redirect back to Postiz with integration connected.
+  </Step>
+  
+  <Step title="Check token storage">
+    Verify tokens are stored in database with correct expiration time.
+  </Step>
+</Steps>
+
+### Post Publishing Testing
+
+```typescript
+// Test different post types
+const testCases = [
+  { type: 'text-only', content: 'Simple text post', media: [] },
+  { type: 'with-image', content: 'Post with image', media: ['image.jpg'] },
+  { type: 'with-video', content: 'Post with video', media: ['video.mp4'] },
+  { type: 'with-multiple', content: 'Multiple images', media: ['1.jpg', '2.jpg'] },
+  { type: 'max-length', content: 'x'.repeat(maxLength), media: [] },
+];
+
+for (const testCase of testCases) {
+  console.log(`Testing: ${testCase.type}`);
+  // Create post via UI or API
+  // Verify it appears on platform
+}
+```
+
+### Error Scenario Testing
+
+<CodeGroup>
+```typescript Token Expiration
+// Manually expire token in database
+await db.integration.update({
+  where: { id: integrationId },
+  data: {
+    tokenExpiration: new Date(Date.now() - 1000), // Expired
+  },
+});
+
+// Try to post
+// Should trigger token refresh
+```
+
+```typescript Rate Limiting
+// Post multiple times quickly
+for (let i = 0; i < 10; i++) {
+  await postService.create({ content: `Post ${i}` });
+}
+
+// Should handle rate limit errors gracefully
+```
+
+```typescript Invalid Media
+// Try uploading unsupported file type
+await postService.create({
+  content: 'Test',
+  media: ['file.exe'], // Invalid
+});
+
+// Should return clear error message
+```
+</CodeGroup>
+
+## Platform-Specific Testing
+
+### Twitter/X Testing
+
+- Test with premium and non-premium accounts (different character limits)
+- Test media uploads (4 images max, 1 video max)
+- Test thread creation
+- Verify duplicate detection works
+
+### LinkedIn Testing
+
+- Test both personal and company page posting
+- Test document uploads (PDFs)
+- Test carousel posts (2-10 images)
+- Verify mentions work correctly
+
+### Facebook/Instagram Testing
+
+- Test different media formats
+- Test first comment feature
+- Test carousel posts
+- Verify location tagging
+
+## Automated E2E Tests
+
+```typescript e2e/integrations.spec.ts
+import { test, expect } from '@playwright/test';
+
+test('connect integration and create post', async ({ page }) => {
+  // Login to Postiz
+  await page.goto('/auth/login');
+  await page.fill('[name="email"]', 'test@example.com');
+  await page.fill('[name="password"]', 'password');
+  await page.click('button[type="submit"]');
+  
+  // Navigate to integrations
+  await page.goto('/settings/integrations');
+  
+  // Click connect for test platform
+  const popup = page.waitForEvent('popup');
+  await page.click('[data-provider="example"]');
+  
+  // Handle OAuth popup
+  const oauthPage = await popup;
+  await oauthPage.fill('[name="username"]', 'testuser');
+  await oauthPage.fill('[name="password"]', 'testpass');
+  await oauthPage.click('button[type="submit"]');
+  await oauthPage.click('[data-action="authorize"]');
+  
+  // Wait for integration to be connected
+  await expect(page.locator('[data-integration="example"]')).toBeVisible();
+  
+  // Create a post
+  await page.goto('/launches');
+  await page.click('[data-action="create-post"]');
+  await page.fill('[data-input="content"]', 'Test post from E2E');
+  await page.click('[data-integration="example"]'); // Select integration
+  await page.click('[data-action="schedule"]');
+  
+  // Verify post was created
+  await expect(page.locator('[data-post-content]')).toContainText('Test post');
+});
+```
+
+## Testing Checklist
+
+<Steps>
+  <Step title="OAuth Flow">
+    - [ ] Authorization URL generation
+    - [ ] State parameter validation
+    - [ ] Code exchange for token
+    - [ ] Scope validation
+    - [ ] User profile fetch
+  </Step>
+  
+  <Step title="Token Management">
+    - [ ] Token storage
+    - [ ] Token refresh before expiry
+    - [ ] Expired token handling
+    - [ ] Invalid token handling
+  </Step>
+  
+  <Step title="Post Publishing">
+    - [ ] Text-only posts
+    - [ ] Posts with images
+    - [ ] Posts with videos
+    - [ ] Multiple media items
+    - [ ] Character limit enforcement
+  </Step>
+  
+  <Step title="Error Handling">
+    - [ ] Network errors
+    - [ ] Rate limit errors
+    - [ ] Invalid media errors
+    - [ ] Insufficient permissions
+    - [ ] Duplicate post detection
+  </Step>
+  
+  <Step title="Analytics (if supported)">
+    - [ ] Fetch post analytics
+    - [ ] Handle missing data
+    - [ ] Date range filtering
+  </Step>
+</Steps>
+
+## Debugging Tips
+
+### Enable Request Logging
+
+```typescript
+override async fetch(url: string, options: RequestInit = {}) {
+  console.log('[REQUEST]', options.method || 'GET', url);
+  console.log('[HEADERS]', options.headers);
+  console.log('[BODY]', options.body);
+  
+  const response = await super.fetch(url, options);
+  
+  const body = await response.text();
+  console.log('[RESPONSE]', response.status, body);
+  
+  return new Response(body, response);
+}
+```
+
+### Test with Sandbox Accounts
+
+Many platforms provide sandbox/test accounts:
+- Use sandbox accounts for development
+- Avoid posting to real accounts during testing
+- Some platforms have test API endpoints
+
+## Best Practices
+
+<Note>
+1. **Test with real APIs** in development, but use mocks for CI/CD
+2. **Store test credentials** securely, never commit them
+3. **Clean up test data** after running tests
+4. **Test error scenarios** as thoroughly as happy paths
+5. **Monitor rate limits** to avoid getting banned
+6. **Use test accounts** separate from production
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Contributing Guidelines" icon="code-pull-request" href="/development/contributing">
+    Learn how to contribute your provider
+  </Card>
+  <Card title="Code Standards" icon="book" href="/development/code-standards">
+    Follow code standards and conventions
+  </Card>
+</CardGroup>

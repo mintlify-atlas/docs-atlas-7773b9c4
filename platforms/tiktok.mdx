@@ -1,0 +1,292 @@
+---
+title: 'TikTok Integration'
+description: 'Schedule and publish TikTok videos and photo carousels'
+---
+
+## Overview
+
+Postiz integrates with TikTok's official API to schedule videos and photo posts with advanced privacy controls and content settings.
+
+<Warning>
+  **TikTok requires at least one attachment:** One video OR one picture OR multiple pictures. Cannot be text-only.
+</Warning>
+
+## Authentication
+
+TikTok uses OAuth 2.0 with short-lived tokens (24 hours).
+
+<Steps>
+  <Step title="Connect TikTok">
+    Click "Connect TikTok" in Integrations
+  </Step>
+  
+  <Step title="Authorize">
+    Grant all requested permissions
+  </Step>
+  
+  <Step title="Auto-Refresh">
+    Tokens automatically refresh every 23 hours
+  </Step>
+</Steps>
+
+<Note>
+  If using HTTP (not HTTPS), Postiz automatically redirects through `redirectmeto.com` for OAuth compatibility.
+</Note>
+
+### Required Permissions
+
+- `video.list` - List videos
+- `user.info.basic` - Basic user info
+- `video.publish` - Publish videos
+- `video.upload` - Upload videos
+- `user.info.profile` - Profile information
+- `user.info.stats` - User statistics
+
+## Supported Features
+
+### Content Types
+
+<Tabs>
+  <Tab title="Video Posts">
+    **Direct Post:**
+    - Publish immediately to profile
+    - Full privacy controls
+    - Duet, comment, stitch settings
+    - AI-generated content labeling
+    
+    **Inbox Upload:**
+    - Sends to TikTok inbox for approval
+    - Limited settings
+    - Mobile app review required
+  </Tab>
+  
+  <Tab title="Photo Posts">
+    - Multiple images supported
+    - Slideshow format
+    - Optional auto music
+    - Maximum 1080p resolution
+    - Title and description separate
+  </Tab>
+</Tabs>
+
+### Post Settings
+
+<AccordionGroup>
+  <Accordion title="Privacy Levels">
+    Control who can view your content:
+    - `PUBLIC_TO_EVERYONE` (default)
+    - `MUTUAL_FOLLOW_FRIENDS`
+    - `SELF_ONLY`
+  </Accordion>
+  
+  <Accordion title="Video Interaction Settings">
+    ```typescript
+    {
+      duet: boolean,              // Allow duets
+      comment: boolean,           // Allow comments
+      stitch: boolean,            // Allow stitches
+      video_made_with_ai: boolean // AI-generated label
+    }
+    ```
+    
+    <Note>These settings only apply to video posts, not photos.</Note>
+  </Accordion>
+  
+  <Accordion title="Brand Content">
+    ```typescript
+    {
+      brand_content_toggle: boolean,  // Mark as branded
+      brand_organic_toggle: boolean   // Organic brand content
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Photo-Specific Settings">
+    ```typescript
+    {
+      title: string,              // Photo post title (90 chars max)
+      description: string,        // Main caption
+      autoAddMusic: "yes" | "no" // Auto-add music to slideshow
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Posting Methods
+
+### Direct Post
+
+Publish immediately to your profile:
+
+<Steps>
+  <Step title="Initialize Post">
+    Request publish endpoint based on content type
+  </Step>
+  
+  <Step title="Submit Content">
+    TikTok pulls media from provided URLs
+  </Step>
+  
+  <Step title="Processing">
+    TikTok processes the media
+  </Step>
+  
+  <Step title="Publication">
+    Post appears on profile when complete
+  </Step>
+</Steps>
+
+### Inbox Upload
+
+Send to TikTok inbox for review:
+
+- Posts sent to your TikTok mobile app inbox
+- Review and approve from mobile device
+- Limited to 5 pending posts maximum
+- Use when direct post isn't available
+
+<Info>
+  If posting method is `UPLOAD`, content goes to inbox. If `DIRECT_POST`, it publishes immediately.
+</Info>
+
+## Media Requirements
+
+### Video Specifications
+
+- **Format**: MP4 (pulled from URL)
+- **Resolution**: Minimum 720p
+- **Duration**: Check with `/maxVideoLength` endpoint
+- **Cover**: Optional timestamp for thumbnail
+
+### Photo Specifications
+
+- **Format**: JPG/PNG (pulled from URL)
+- **Resolution**: Maximum 1080p, minimum depends on account
+- **Quantity**: Multiple photos create slideshow
+- **Auto Music**: Optional background music
+
+<Warning>
+  **Resolution Requirements:**
+  - Videos must be at least 720p
+  - Photos must not exceed 1080p
+  - Error `picture_size_check_failed` indicates resolution issues
+</Warning>
+
+## Upload Status Tracking
+
+TikTok posts go through several statuses:
+
+1. **PROCESSING_DOWNLOAD**: Downloading media
+2. **PROCESSING_UPLOAD**: Uploading to TikTok
+3. **PROCESSING**: Processing media
+4. **SEND_TO_USER_INBOX**: Sent to inbox
+5. **PUBLISH_COMPLETE**: Successfully published
+6. **FAILED**: Upload failed
+
+Postiz polls status every 10 seconds until complete.
+
+## Analytics
+
+### Account-Level Analytics
+
+- **Followers**: Total follower count
+- **Following**: Following count
+- **Total Likes**: All-time likes
+- **Videos**: Total video count
+- **Views**: Recent video views (aggregated)
+- **Recent Likes**: Likes on recent videos
+- **Recent Comments**: Comments on recent videos
+- **Recent Shares**: Shares of recent videos
+
+### Video-Level Analytics
+
+- **Views**: Total views
+- **Likes**: Like count
+- **Comments**: Comment count  
+- **Shares**: Share count
+
+## Rate Limits
+
+<Warning>
+  **TikTok Posting Limits:**
+  - Maximum 300 concurrent jobs
+  - Daily post limit (varies by account)
+  - Maximum 5 pending inbox posts
+  - Spam detection applies
+</Warning>
+
+## Error Handling
+
+Common TikTok errors:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| access_token_invalid | Token expired | Automatic refresh/reconnect |
+| rate_limit_exceeded | Too many requests | Wait and retry |
+| spam_risk_too_many_posts | Daily limit reached | Wait until tomorrow |
+| spam_risk_too_many_pending_share | 5 inbox posts pending | Approve pending posts in app |
+| spam_risk_text | Content flagged as spam | Modify text content |
+| spam_risk_user_banned_from_posting | Account banned | Check TikTok account status |
+| picture_size_check_failed | Resolution issue | Videos: 720p+, Photos: ≤1080p |
+| duration_check_failed | Video duration invalid | Check max duration for account |
+| video_pull_failed | Can't download video | Verify video URL is accessible |
+
+<Info>
+  Spam detection is aggressive. Vary your content and avoid repetitive posting patterns.
+</Info>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Video Format">
+    Vertical 9:16 videos (1080x1920) perform best
+  </Card>
+  
+  <Card title="Content Timing">
+    Post during peak hours: 6-9 PM local time
+  </Card>
+  
+  <Card title="Hashtag Strategy">
+    Use trending and niche hashtags (3-5 per post)
+  </Card>
+  
+  <Card title="Engagement Settings">
+    Enable duets and stitches for maximum reach
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Inbox Posts Only">
+    If posts only go to inbox:
+    - Check if account is verified
+    - Unaudited apps may be restricted to private accounts
+    - Try using `DIRECT_POST` method
+    - Contact TikTok for API approval
+  </Accordion>
+  
+  <Accordion title="Spam Flagged">
+    If content is flagged:
+    - Vary your posting content
+    - Avoid repetitive text/hashtags
+    - Check daily posting limit (5+ may trigger)
+    - Review TikTok Community Guidelines
+  </Accordion>
+  
+  <Accordion title="Video Pull Failed">
+    If video download fails:
+    - Ensure URL is publicly accessible
+    - Check video format is MP4
+    - Verify file isn't corrupted
+    - Try re-uploading to hosting
+  </Accordion>
+  
+  <Accordion title="Resolution Errors">
+    For size check failures:
+    - Videos: Must be 720p or higher
+    - Photos: Cannot exceed 1080p
+    - Check aspect ratio compatibility
+    - Resize media before uploading
+  </Accordion>
+</AccordionGroup>

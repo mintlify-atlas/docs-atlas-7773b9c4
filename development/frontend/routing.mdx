@@ -1,0 +1,412 @@
+---
+title: Next.js Routing Structure
+description: Understanding the App Router structure in Postiz
+---
+
+## Overview
+
+Postiz uses **Next.js 14 App Router** with file-system based routing. Routes are organized using route groups and follow a clear structure for protected and public pages.
+
+## Routing Structure
+
+```
+apps/frontend/src/app/
+├── (app)/                      # Protected app routes (requires auth)
+│   ├── (site)/                 # Main application
+│   │   ├── analytics/
+│   │   │   └── page.tsx       # /analytics
+│   │   ├── media/
+│   │   │   └── page.tsx       # /media
+│   │   ├── launches/
+│   │   │   └── page.tsx       # /launches
+│   │   ├── settings/
+│   │   │   └── page.tsx       # /settings
+│   │   └── layout.tsx
+│   └── layout.tsx
+├── auth/                      # Public authentication routes
+│   ├── login/
+│   │   └── page.tsx           # /auth/login
+│   ├── register/
+│   │   └── page.tsx           # /auth/register
+│   └── layout.tsx
+├── api/                       # API routes
+│   └── [...]/route.ts
+├── layout.tsx                 # Root layout
+└── middleware.ts              # Auth middleware
+```
+
+<Info>
+Route groups (folders with parentheses like `(app)`) don't affect the URL path. They're used for organization and shared layouts.
+</Info>
+
+## Route Groups Explained
+
+### (app) Group - Protected Routes
+
+The `(app)` route group contains all authenticated user routes:
+
+```typescript apps/frontend/src/app/(app)/layout.tsx
+export default async function AppLayout({ children }: { children: ReactNode }) {
+  return (
+    <LayoutContext>
+      <div className="flex h-screen bg-newBgColor">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+      </div>
+    </LayoutContext>
+  );
+}
+```
+
+### (site) Group - Main Application
+
+Nested inside `(app)`, contains the main app features:
+
+```
+(site)/
+├── analytics/     # Analytics dashboard
+├── media/         # Media library
+├── launches/      # Post calendar
+├── settings/      # Settings
+├── agents/        # AI agents
+└── billing/       # Subscription
+```
+
+## Page Components
+
+### Creating a Page
+
+```typescript page.tsx
+'use client';
+
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch.tsx';
+import useSWR from 'swr';
+
+export default function AnalyticsPage() {
+  const fetch = useFetch();
+  
+  const { data, error, isLoading } = useSWR(
+    'analytics',
+    () => fetch('/api/analytics')
+  );
+
+  if (isLoading) return <LoadingState />;
+  if (error) return <ErrorState error={error} />;
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-6">Analytics</h1>
+      <AnalyticsContent data={data} />
+    </div>
+  );
+}
+```
+
+### Server vs Client Components
+
+```typescript
+// Server Component (default, can fetch data)
+export default async function Page() {
+  const data = await getData();
+  return <div>{data.title}</div>;
+}
+
+// Client Component (needs 'use client' directive)
+'use client';
+
+export default function Page() {
+  const [state, setState] = useState();
+  return <div onClick={() => setState(...)}>...</div>;
+}
+```
+
+## Layouts
+
+### Root Layout
+
+The root layout wraps the entire application:
+
+```typescript app/layout.tsx
+import '../global.scss';
+import { ReactNode } from 'react';
+import { Plus_Jakarta_Sans } from 'next/font/google';
+import LayoutContext from '@gitroom/frontend/components/layout/layout.context';
+
+const jakartaSans = Plus_Jakarta_Sans({
+  weight: ['600', '500'],
+  style: ['normal', 'italic'],
+  subsets: ['latin'],
+});
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html>
+      <body className="dark text-primary !bg-primary">
+        <LayoutContext>
+          {children}
+        </LayoutContext>
+      </body>
+    </html>
+  );
+}
+```
+
+### Nested Layouts
+
+```typescript (app)/layout.tsx
+export default function ProtectedLayout({ children }) {
+  return (
+    <div className="flex h-screen">
+      <Sidebar />
+      <main className="flex-1">
+        {children}
+      </main>
+    </div>
+  );
+}
+```
+
+## Navigation
+
+### Link Component
+
+```typescript
+import Link from 'next/link';
+
+<Link 
+  href="/features/analytics" 
+  className="text-newTextColor hover:text-textItemFocused"
+>
+  Analytics
+</Link>
+```
+
+### Programmatic Navigation
+
+```typescript
+'use client';
+
+import { useRouter } from 'next/navigation';
+
+export default function MyComponent() {
+  const router = useRouter();
+  
+  const handleClick = () => {
+    router.push('/analytics');
+    // router.replace('/analytics'); // no history entry
+    // router.back(); // go back
+  };
+}
+```
+
+## Dynamic Routes
+
+### Single Dynamic Segment
+
+```
+posts/
+└── [id]/
+    └── page.tsx    # /posts/123
+```
+
+```typescript posts/[id]/page.tsx
+export default function PostPage({ params }: { params: { id: string } }) {
+  return <div>Post ID: {params.id}</div>;
+}
+```
+
+### Catch-all Routes
+
+```
+docs/
+└── [...slug]/
+    └── page.tsx    # /docs/a, /docs/a/b, /docs/a/b/c
+```
+
+```typescript docs/[...slug]/page.tsx
+export default function DocsPage({ params }: { params: { slug: string[] } }) {
+  return <div>Path: {params.slug.join('/')}</div>;
+}
+```
+
+## API Routes
+
+### Creating API Routes
+
+```typescript app/api/posts/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+
+// GET /api/posts
+export async function GET(request: NextRequest) {
+  const posts = await fetchPosts();
+  return NextResponse.json(posts);
+}
+
+// POST /api/posts
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+  const post = await createPost(body);
+  return NextResponse.json(post, { status: 201 });
+}
+```
+
+### Dynamic API Routes
+
+```typescript app/api/posts/[id]/route.ts
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const post = await getPost(params.id);
+  return NextResponse.json(post);
+}
+```
+
+## Middleware
+
+Authentication middleware protects routes:
+
+```typescript middleware.ts
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+export function middleware(request: NextRequest) {
+  const auth = request.cookies.get('auth');
+  
+  // Protected routes
+  if (request.nextUrl.pathname.startsWith('/analytics') && !auth) {
+    return NextResponse.redirect(new URL('/auth/login', request.url));
+  }
+  
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
+};
+```
+
+## Loading and Error States
+
+### Loading UI
+
+```typescript loading.tsx
+export default function Loading() {
+  return (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-btnPrimary" />
+    </div>
+  );
+}
+```
+
+### Error Handling
+
+```typescript error.tsx
+'use client';
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error;
+  reset: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center h-screen">
+      <h2 className="text-2xl font-bold mb-4">Something went wrong!</h2>
+      <p className="text-textItemBlur mb-4">{error.message}</p>
+      <button onClick={reset} className="bg-btnPrimary text-btnText px-4 py-2 rounded-lg">
+        Try again
+      </button>
+    </div>
+  );
+}
+```
+
+## Metadata
+
+### Static Metadata
+
+```typescript page.tsx
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Analytics - Postiz',
+  description: 'View your social media analytics',
+};
+
+export default function AnalyticsPage() {
+  return <div>Analytics</div>;
+}
+```
+
+### Dynamic Metadata
+
+```typescript posts/[id]/page.tsx
+import { Metadata } from 'next';
+
+export async function generateMetadata(
+  { params }: { params: { id: string } }
+): Promise<Metadata> {
+  const post = await getPost(params.id);
+  
+  return {
+    title: post.title,
+    description: post.excerpt,
+  };
+}
+```
+
+## Route Handlers vs API Routes
+
+<Note>
+In Next.js 14 App Router, API routes are called "Route Handlers" and use `route.ts` files.
+</Note>
+
+```typescript app/api/hello/route.ts
+import { NextResponse } from 'next/server';
+
+export async function GET() {
+  return NextResponse.json({ message: 'Hello World' });
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Use route groups">
+    Organize routes with parentheses groups like `(app)` and `(site)`.
+  </Step>
+  
+  <Step title="Colocate related files">
+    Keep components close to the routes that use them.
+  </Step>
+  
+  <Step title="Use layouts for shared UI">
+    Avoid duplicating navigation and headers across pages.
+  </Step>
+  
+  <Step title="Server components by default">
+    Only use 'use client' when you need interactivity.
+  </Step>
+  
+  <Step title="Handle loading and errors">
+    Always provide loading.tsx and error.tsx for better UX.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Component Architecture" icon="cubes" href="/development/frontend/components">
+    Learn component patterns
+  </Card>
+  <Card title="Styling Guide" icon="palette" href="/development/frontend/styling">
+    Master Tailwind CSS
+  </Card>
+</CardGroup>

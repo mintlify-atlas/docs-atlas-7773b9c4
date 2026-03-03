@@ -1,0 +1,613 @@
+---
+title: Database Schema and Prisma
+description: Understanding the Postiz database structure and Prisma ORM
+---
+
+## Overview
+
+Postiz uses **PostgreSQL** as its primary database, managed through **Prisma ORM**. The schema is centrally located and shared across backend and orchestrator applications.
+
+<Info>
+**Schema Location**: `libraries/nestjs-libraries/src/database/prisma/schema.prisma`
+
+This central location allows both the backend API and orchestrator to access the same database models.
+</Info>
+
+## Prisma Configuration
+
+```prisma schema.prisma
+generator client {
+  provider = "prisma-client-js"
+  runtime  = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+```
+
+## Core Models
+
+### Organization
+
+The root entity representing a workspace or team:
+
+```prisma
+model Organization {
+  id                String              @id @default(uuid())
+  name              String
+  description       String?
+  apiKey            String?
+  paymentId         String?
+  streakSince       DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  allowTrial        Boolean             @default(false)
+  isTrailing        Boolean             @default(false)
+  shortlink         ShortLinkPreference @default(ASK)
+  
+  // Relations
+  users             UserOrganization[]
+  post              Post[]              @relation("organization")
+  Integration       Integration[]
+  media             Media[]
+  subscription      Subscription?
+  webhooks          Webhooks[]
+  tags              Tags[]
+  
+  @@index([apiKey])
+  @@index([streakSince])
+  @@index([paymentId])
+}
+```
+
+**Key Fields:**
+- `apiKey` - API key for programmatic access
+- `paymentId` - Stripe customer/subscription ID
+- `streakSince` - Date of current posting streak
+- `shortlink` - Short link preference (ASK, ALWAYS, NEVER)
+
+### User
+
+Represents individual users:
+
+```prisma
+model User {
+  id                    String             @id @default(uuid())
+  email                 String
+  password              String?
+  providerName          Provider
+  name                  String?
+  lastName              String?
+  isSuperAdmin          Boolean            @default(false)
+  timezone              Int
+  activated             Boolean            @default(true)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  lastReadNotifications DateTime           @default(now())
+  sendSuccessEmails     Boolean            @default(true)
+  sendFailureEmails     Boolean            @default(true)
+  
+  // Relations
+  organizations         UserOrganization[]
+  picture               Media?             @relation(fields: [pictureId], references: [id])
+  
+  @@unique([email, providerName])
+  @@index([lastReadNotifications])
+}
+```
+
+**Provider Enum:**
+```prisma
+enum Provider {
+  LOCAL
+  GOOGLE
+  GITHUB
+  GENERIC
+}
+```
+
+### UserOrganization (Join Table)
+
+Links users to organizations with roles:
+
+```prisma
+model UserOrganization {
+  id             String       @id @default(uuid())
+  userId         String
+  organizationId String
+  disabled       Boolean      @default(false)
+  role           Role         @default(USER)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, organizationId])
+}
+```
+
+**Role Enum:**
+```prisma
+enum Role {
+  USER
+  ADMIN
+  SUPERADMIN
+}
+```
+
+## Post Management
+
+### Post
+
+Core model for scheduled social media posts:
+
+```prisma
+model Post {
+  id                String              @id @default(uuid())
+  content           String?
+  organizationId    String
+  publishDate       DateTime
+  state             State               @default(DRAFT)
+  submittedForOrder String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  group             String?             @default(uuid())
+  deletedAt         DateTime?
+  
+  // Relations
+  organization      Organization        @relation("organization", fields: [organizationId], references: [id])
+  integration       Integration[]       @relation("integration")
+  postIntegrations  PostIntegration[]
+  tags              TagsPosts[]
+  
+  @@index([organizationId])
+  @@index([publishDate])
+  @@index([state])
+  @@index([deletedAt])
+}
+```
+
+**State Enum:**
+```prisma
+enum State {
+  DRAFT
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  ERROR
+  DELETED
+}
+```
+
+### PostIntegration
+
+Links posts to specific integrations with publishing details:
+
+```prisma
+model PostIntegration {
+  id            String       @id @default(uuid())
+  postId        String
+  integrationId String
+  externalId    String?
+  status        String       @default("pending")
+  error         String?
+  publishedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  post          Post         @relation(fields: [postId], references: [id])
+  integration   Integration  @relation(fields: [integrationId], references: [id])
+  
+  @@index([postId])
+  @@index([integrationId])
+  @@index([status])
+}
+```
+
+## Integration Models
+
+### Integration
+
+Social media account connections:
+
+```prisma
+model Integration {
+  id                String             @id @default(uuid())
+  internalId        String
+  name              String
+  picture           String?
+  type              String
+  token             String
+  refreshToken      String?
+  expiresIn         Int?
+  username          String?
+  organizationId    String
+  disabled          Boolean            @default(false)
+  tokenExpiration   DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  posts             Post[]             @relation("integration")
+  postIntegrations  PostIntegration[]
+  
+  @@index([organizationId])
+  @@index([type])
+  @@index([disabled])
+  @@index([tokenExpiration])
+}
+```
+
+**Supported Integration Types:**
+- X (Twitter)
+- Facebook
+- Instagram
+- LinkedIn (Personal & Company Pages)
+- YouTube
+- TikTok
+- Pinterest
+- Reddit
+- ... and 20+ more
+
+## Media Management
+
+### Media
+
+File storage and management:
+
+```prisma
+model Media {
+  id                 String              @id @default(uuid())
+  name               String
+  originalName       String?
+  path               String
+  organizationId     String
+  fileSize           Int                 @default(0)
+  type               String              @default("image")
+  thumbnail          String?
+  alt                String?
+  thumbnailTimestamp Int?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  deletedAt          DateTime?
+  
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  
+  @@index([name])
+  @@index([organizationId])
+  @@index([type])
+}
+```
+
+**Media Types:**
+- `image` - Images (JPG, PNG, GIF, etc.)
+- `video` - Videos (MP4, MOV, etc.)
+- `document` - PDFs and documents
+
+## Subscription & Billing
+
+### Subscription
+
+```prisma
+model Subscription {
+  id               String           @id @default(cuid())
+  organizationId   String           @unique
+  subscriptionTier SubscriptionTier
+  identifier       String?          // Stripe subscription ID
+  cancelAt         DateTime?
+  period           Period
+  totalChannels    Int
+  isLifetime       Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+  
+  organization     Organization     @relation(fields: [organizationId], references: [id])
+  
+  @@index([organizationId])
+  @@index([deletedAt])
+}
+```
+
+**Subscription Tiers:**
+```prisma
+enum SubscriptionTier {
+  FREE
+  STANDARD
+  PRO
+  ULTIMATE
+}
+
+enum Period {
+  MONTHLY
+  YEARLY
+}
+```
+
+## Tagging System
+
+### Tags
+
+```prisma
+model Tags {
+  id           String       @id @default(uuid())
+  name         String
+  color        String
+  orgId        String
+  deletedAt    DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  
+  organization Organization @relation(fields: [orgId], references: [id])
+  posts        TagsPosts[]
+  
+  @@index([orgId])
+  @@index([deletedAt])
+}
+```
+
+### TagsPosts (Join Table)
+
+```prisma
+model TagsPosts {
+  postId    String
+  tagId     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  post      Post     @relation(fields: [postId], references: [id])
+  tag       Tags     @relation(fields: [tagId], references: [id])
+  
+  @@id([postId, tagId])
+  @@unique([postId, tagId])
+}
+```
+
+## Prisma Commands
+
+### Generate Client
+
+Generate Prisma Client after schema changes:
+
+```bash
+pnpm prisma-generate
+```
+
+This runs:
+```bash
+pnpx prisma@6.5.0 generate --schema ./libraries/nestjs-libraries/src/database/prisma/schema.prisma
+```
+
+### Push Schema Changes
+
+Push schema changes to database (development):
+
+```bash
+pnpm prisma-db-push
+```
+
+<Warning>
+This command uses `--accept-data-loss` flag. Use with caution in production!
+</Warning>
+
+### Pull Schema from Database
+
+Generate schema from existing database:
+
+```bash
+pnpm prisma-db-pull
+```
+
+### Create Migration
+
+For production, create migrations:
+
+```bash
+pnpx prisma migrate dev --schema ./libraries/nestjs-libraries/src/database/prisma/schema.prisma
+```
+
+## Using Prisma Client
+
+### In Services
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { DatabaseService } from '@gitroom/nestjs-libraries/database/prisma/database.service';
+
+@Injectable()
+export class PostsRepository {
+  constructor(private _db: DatabaseService) {}
+
+  async findById(id: string) {
+    return this._db.post.findUnique({
+      where: { id },
+      include: {
+        organization: true,
+        integration: true,
+        tags: true,
+      },
+    });
+  }
+
+  async create(data: CreatePostDto) {
+    return this._db.post.create({
+      data: {
+        content: data.content,
+        publishDate: data.scheduledAt,
+        organization: {
+          connect: { id: data.organizationId },
+        },
+      },
+    });
+  }
+
+  async findMany(params: FindManyParams) {
+    return this._db.post.findMany({
+      where: params.where,
+      include: params.include,
+      orderBy: { createdAt: 'desc' },
+      take: params.limit,
+      skip: params.offset,
+    });
+  }
+}
+```
+
+### Common Patterns
+
+<CodeGroup>
+```typescript Find Unique
+const user = await db.user.findUnique({
+  where: { email: 'user@example.com' },
+});
+```
+
+```typescript Find Many with Relations
+const posts = await db.post.findMany({
+  where: { organizationId },
+  include: {
+    integration: true,
+    tags: {
+      include: {
+        tag: true,
+      },
+    },
+  },
+  orderBy: { publishDate: 'asc' },
+});
+```
+
+```typescript Create with Relations
+const post = await db.post.create({
+  data: {
+    content: 'Hello World',
+    publishDate: new Date(),
+    organization: {
+      connect: { id: orgId },
+    },
+    integration: {
+      connect: [
+        { id: integrationId1 },
+        { id: integrationId2 },
+      ],
+    },
+  },
+});
+```
+
+```typescript Update
+await db.post.update({
+  where: { id: postId },
+  data: {
+    state: 'PUBLISHED',
+    publishedAt: new Date(),
+  },
+});
+```
+
+```typescript Delete (Soft Delete)
+await db.post.update({
+  where: { id: postId },
+  data: {
+    deletedAt: new Date(),
+  },
+});
+```
+</CodeGroup>
+
+## Indexing Strategy
+
+Key indexes for performance:
+
+```prisma
+// Organization indexes
+@@index([apiKey])
+@@index([paymentId])
+
+// Post indexes
+@@index([organizationId])
+@@index([publishDate])
+@@index([state])
+@@index([deletedAt])
+
+// Integration indexes
+@@index([organizationId])
+@@index([type])
+@@index([disabled])
+@@index([tokenExpiration])
+
+// User indexes
+@@index([lastReadNotifications])
+@@index([lastOnline])
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Always use repositories">
+    Never access Prisma directly in services. Create repository classes for data access.
+  </Step>
+  
+  <Step title="Use soft deletes">
+    Set `deletedAt` instead of hard deleting records for audit trail.
+  </Step>
+  
+  <Step title="Include relations selectively">
+    Only include relations you need to avoid N+1 queries and over-fetching.
+  </Step>
+  
+  <Step title="Use transactions for complex operations">
+    Wrap multiple operations in `db.$transaction()` for data consistency.
+  </Step>
+  
+  <Step title="Index query fields">
+    Add indexes for fields used in WHERE clauses and JOINs.
+  </Step>
+</Steps>
+
+## Transactions
+
+```typescript
+await this._db.$transaction(async (tx) => {
+  // Create post
+  const post = await tx.post.create({
+    data: { ...postData },
+  });
+
+  // Create post integrations
+  await tx.postIntegration.createMany({
+    data: integrations.map(int => ({
+      postId: post.id,
+      integrationId: int.id,
+    })),
+  });
+
+  // Update organization
+  await tx.organization.update({
+    where: { id: orgId },
+    data: { updatedAt: new Date() },
+  });
+
+  return post;
+});
+```
+
+## Environment Configuration
+
+```bash .env
+DATABASE_URL="postgresql://user:password@localhost:5432/postiz?schema=public"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Frontend Overview" icon="browser" href="/development/frontend/overview">
+    Learn about frontend development
+  </Card>
+  <Card title="Creating Integrations" icon="plug" href="/development/integrations/creating-provider">
+    Build a new social media integration
+  </Card>
+</CardGroup>

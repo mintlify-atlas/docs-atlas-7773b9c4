@@ -1,0 +1,302 @@
+---
+title: 'Post Scheduling'
+description: 'Schedule posts across multiple social media platforms with flexible timing and automation'
+---
+
+## Overview
+
+Postiz provides powerful post scheduling capabilities that allow you to plan and automate your social media content across 28+ platforms. Schedule posts in advance, set optimal posting times, and manage your entire content calendar from one place.
+
+## Scheduling Methods
+
+<CardGroup cols={2}>
+  <Card title="Manual Scheduling" icon="calendar">
+    Pick specific dates and times for each post with full control over when content goes live.
+  </Card>
+  <Card title="Auto-Scheduling" icon="clock">
+    Let Postiz find optimal posting times based on your pre-configured time slots.
+  </Card>
+  <Card title="Bulk Scheduling" icon="layer-group">
+    Schedule multiple posts at once with the AI-powered content generator.
+  </Card>
+  <Card title="Recurring Posts" icon="repeat">
+    Set up posts to repeat on a schedule (coming soon).
+  </Card>
+</CardGroup>
+
+## Creating a Scheduled Post
+
+<Steps>
+  <Step title="Access the Calendar">
+    Navigate to the Calendar view from the main menu. This is your central hub for all scheduled content.
+    
+    ```typescript
+    // Posts are fetched from: /posts endpoint
+    const { data } = useSWR(`/posts?startDate=${startDate}&endDate=${endDate}`);
+    ```
+  </Step>
+
+  <Step title="Add New Post">
+    Click the "New Post" button or click on any time slot in the calendar to create a new post.
+    
+    <Info>
+      The system automatically finds the next available time slot using the `/posts/find-slot` endpoint.
+    </Info>
+  </Step>
+
+  <Step title="Select Channels">
+    Choose which social media channels to post to. You can select multiple channels for cross-posting.
+    
+    ```typescript
+    // Available integrations from backend
+    integrations: Array<{
+      id: string;
+      name: string;
+      identifier: string; // 'x', 'linkedin', 'facebook', etc.
+      picture: string;
+      disabled: boolean;
+    }>
+    ```
+  </Step>
+
+  <Step title="Set Publishing Time">
+    Pick your desired date and time. The time picker supports both 12-hour (US) and 24-hour formats.
+    
+    <Tabs>
+      <Tab title="Manual Time Selection">
+        Use the date/time picker to choose an exact publishing time.
+        
+        ```typescript
+        // Time is stored in UTC and converted to local timezone
+        const publishDate = dayjs.utc(date).local();
+        ```
+      </Tab>
+      
+      <Tab title="Auto-Schedule">
+        Click "Find Next Slot" to automatically schedule at the next available time based on your channel's time slots.
+        
+        ```typescript
+        // API endpoint: GET /posts/find-slot
+        const { date } = await fetch('/posts/find-slot').json();
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Create Content">
+    Write your post content, add media, and configure platform-specific settings.
+    
+    <Note>
+      Each platform may have different character limits and media requirements. Postiz automatically validates these for you.
+    </Note>
+  </Step>
+
+  <Step title="Schedule or Publish">
+    Choose to schedule for later or publish immediately.
+    
+    ```typescript
+    // POST /posts endpoint
+    {
+      group: string,           // Groups posts scheduled together
+      posts: [{
+        integration: string,   // Channel ID
+        content: string,
+        publishDate: string,   // ISO date string
+        image: Array<{id, path}>,
+        settings: object       // Platform-specific settings
+      }]
+    }
+    ```
+  </Step>
+</Steps>
+
+## Time Slot Management
+
+Configure optimal posting times for each channel to maximize engagement.
+
+### Setting Up Time Slots
+
+<Steps>
+  <Step title="Open Channel Settings">
+    Right-click on any channel in the calendar sidebar and select "Time Settings".
+  </Step>
+  
+  <Step title="Add Time Slots">
+    Add multiple time slots throughout the day when you want posts to be scheduled.
+    
+    ```typescript
+    // Time slots are stored as minutes from midnight (UTC)
+    time: [{
+      time: number // e.g., 540 = 9:00 AM
+    }]
+    ```
+  </Step>
+  
+  <Step title="Save Configuration">
+    Time slots are saved per channel and used for auto-scheduling.
+    
+    ```typescript
+    // POST /integrations/:id/time
+    {
+      time: [{ time: 540 }, { time: 720 }, { time: 1080 }]
+    }
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  **Pro Tip:** Set 3-4 time slots per day based on when your audience is most active. This gives the auto-scheduler flexibility while maintaining optimal timing.
+</Tip>
+
+## Post States
+
+Posts move through different states during their lifecycle:
+
+<Accordion title="Post State Lifecycle">
+  - **Draft** - Post is being created or edited
+  - **Scheduled** - Post is scheduled and waiting to be published
+  - **Publishing** - Post is currently being sent to the platform
+  - **Published** - Post has been successfully published
+  - **Error** - Post failed to publish (can be retried)
+  - **Deleted** - Post has been deleted from the schedule
+  
+  ```typescript
+  enum State {
+    DRAFT = 'DRAFT',
+    SCHEDULED = 'SCHEDULED', 
+    PUBLISHING = 'PUBLISHING',
+    PUBLISHED = 'PUBLISHED',
+    ERROR = 'ERROR',
+    DELETED = 'DELETED'
+  }
+  ```
+</Accordion>
+
+## Editing Scheduled Posts
+
+You can modify scheduled posts at any time before they're published:
+
+```typescript
+// GET /posts/group/:group - Fetch post group for editing
+const data = await fetch(`/posts/group/${post.group}`).json();
+
+// PUT /posts/:id/date - Change publishing time
+await fetch(`/posts/${id}/date`, {
+  method: 'PUT',
+  body: JSON.stringify({ 
+    date: newDate,
+    action: 'schedule' // or 'update'
+  })
+});
+```
+
+<Warning>
+  Changes to posts scheduled in the next 5 minutes may not take effect if the publishing workflow has already started.
+</Warning>
+
+## Deleting Scheduled Posts
+
+```typescript
+// DELETE /posts/:group - Delete entire post group
+await fetch(`/posts/${group}`, {
+  method: 'DELETE'
+});
+```
+
+## Drag-and-Drop Rescheduling
+
+The calendar view supports drag-and-drop rescheduling:
+
+<Steps>
+  <Step title="Enable Drag Mode">
+    Posts in the calendar can be dragged to different time slots.
+    
+    ```typescript
+    const [{ isDragging }, drag] = useDrag(() => ({
+      type: 'post',
+      item: { post },
+      collect: (monitor) => ({
+        isDragging: monitor.isDragging()
+      })
+    }));
+    ```
+  </Step>
+  
+  <Step title="Drop to Reschedule">
+    Drop the post on a new time slot to automatically reschedule.
+    
+    ```typescript
+    const [{ isOver }, drop] = useDrop(() => ({
+      accept: 'post',
+      drop: (item) => {
+        // Update post time via API
+        changeDate(item.post.id, newDate);
+      }
+    }));
+    ```
+  </Step>
+</Steps>
+
+## Timezone Handling
+
+All times are stored in UTC and converted to your local timezone for display:
+
+```typescript
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+// Store in UTC
+const utcDate = dayjs(localDate).utc().toISOString();
+
+// Display in local timezone
+const localDate = dayjs.utc(utcDate).local().format('YYYY-MM-DD HH:mm');
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Plan Ahead" icon="calendar-days">
+    Schedule posts at least 24 hours in advance to avoid last-minute changes.
+  </Card>
+  
+  <Card title="Use Time Slots" icon="clock">
+    Configure 3-4 optimal time slots per channel for consistent posting.
+  </Card>
+  
+  <Card title="Review Before Publishing" icon="eye">
+    Always preview your posts before scheduling to catch any errors.
+  </Card>
+  
+  <Card title="Monitor Post Status" icon="chart-line">
+    Check your calendar regularly to ensure all posts are publishing successfully.
+  </Card>
+</CardGroup>
+
+## API Reference
+
+Key endpoints for post scheduling:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/posts` | GET | Fetch posts for a date range |
+| `/posts` | POST | Create new scheduled post |
+| `/posts/:id` | GET | Get single post details |
+| `/posts/:group` | DELETE | Delete scheduled post |
+| `/posts/:id/date` | PUT | Change post date/time |
+| `/posts/find-slot` | GET | Find next available time slot |
+| `/posts/find-slot/:id` | GET | Find next slot for specific channel |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Calendar View" icon="calendar" href="/features/calendar">
+    Learn about the calendar interface and views
+  </Card>
+  <Card title="AI Features" icon="sparkles" href="/features/ai-features">
+    Use AI to generate and schedule content automatically
+  </Card>
+</CardGroup>

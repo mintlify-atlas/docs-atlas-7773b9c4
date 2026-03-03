@@ -1,0 +1,486 @@
+---
+title: 'Email Configuration'
+description: 'Configure email delivery with Resend or NodeMailer for transactional emails'
+---
+
+Postiz sends transactional emails for user activation, notifications, and team invitations. Configure email delivery using Resend (recommended) or NodeMailer.
+
+## Email Providers
+
+Postiz supports three email providers:
+
+- **Resend** - Modern email API (recommended)
+- **NodeMailer** - SMTP-based email delivery
+- **Empty** - No email delivery (auto-activation)
+
+## Environment Variables
+
+### Required Settings
+
+Add these variables to your `.env` file:
+
+```bash
+EMAIL_PROVIDER="resend"  # or "nodemailer"
+EMAIL_FROM_ADDRESS="noreply@yourdomain.com"
+EMAIL_FROM_NAME="Postiz"
+```
+
+<Info>
+  If `EMAIL_PROVIDER` is not set, Postiz uses the Empty provider and automatically activates users without email verification.
+</Info>
+
+### Provider-Specific Configuration
+
+<CodeGroup>
+
+```bash Resend (Recommended)
+EMAIL_PROVIDER="resend"
+RESEND_API_KEY="re_xxxxxxxxxxxxxxxxxxxx"
+EMAIL_FROM_ADDRESS="noreply@yourdomain.com"
+EMAIL_FROM_NAME="Postiz"
+```
+
+```bash NodeMailer (SMTP)
+EMAIL_PROVIDER="nodemailer"
+NODEMAILER_HOST="smtp.gmail.com"
+NODEMAILER_PORT="587"
+NODEMAILER_SECURE="false"
+NODEMAILER_USER="your-email@gmail.com"
+NODEMAILER_PASS="your-app-password"
+EMAIL_FROM_ADDRESS="your-email@gmail.com"
+EMAIL_FROM_NAME="Postiz"
+```
+
+```bash Disabled (Auto-activation)
+# Comment out or remove these variables:
+# EMAIL_PROVIDER=""
+# RESEND_API_KEY=""
+# EMAIL_FROM_ADDRESS=""
+# EMAIL_FROM_NAME=""
+
+# Users will be auto-activated without email verification
+```
+
+</CodeGroup>
+
+## Setup with Resend (Recommended)
+
+Resend is the recommended email provider for production deployments.
+
+<Steps>
+
+<Step title="Create Resend Account">
+  1. Visit [resend.com](https://resend.com) and create an account
+  2. Verify your email address
+  3. Navigate to the API Keys section
+</Step>
+
+<Step title="Generate API Key">
+  1. Click "Create API Key"
+  2. Name it "Postiz Production" or similar
+  3. Select "Sending access" permission
+  4. Copy the API key (starts with `re_`)
+</Step>
+
+<Step title="Verify Domain">
+  To send from your own domain:
+  
+  1. Go to Domains → Add Domain
+  2. Enter your domain (e.g., `yourdomain.com`)
+  3. Add the provided DNS records to your domain:
+     - SPF record
+     - DKIM record
+     - DMARC record (optional but recommended)
+  4. Wait for verification (usually 5-15 minutes)
+</Step>
+
+<Step title="Configure Environment">
+  Add to your `.env` file:
+  
+  ```bash
+  EMAIL_PROVIDER="resend"
+  RESEND_API_KEY="re_xxxxxxxxxxxxxxxxxxxx"
+  EMAIL_FROM_ADDRESS="noreply@yourdomain.com"
+  EMAIL_FROM_NAME="Postiz"
+  ```
+  
+  <Note>
+    Use a subdomain like `noreply@` or `notifications@` for transactional emails to avoid deliverability issues.
+  </Note>
+</Step>
+
+<Step title="Restart Postiz">
+  Apply the configuration:
+  
+  ```bash
+  docker compose restart backend
+  ```
+  
+  Check the logs to verify email service initialization:
+  
+  ```bash
+  docker compose logs backend | grep "Email service"
+  ```
+  
+  You should see:
+  ```
+  Email service provider: resend
+  ```
+</Step>
+
+</Steps>
+
+## Setup with NodeMailer (SMTP)
+
+Use NodeMailer if you have an existing SMTP server or email service.
+
+<Steps>
+
+<Step title="Get SMTP Credentials">
+  Obtain SMTP credentials from your email provider:
+  
+  - **Gmail**: Use App Passwords (requires 2FA enabled)
+  - **SendGrid**: Get SMTP credentials from Settings
+  - **Mailgun**: Use SMTP credentials from domain settings
+  - **Custom SMTP**: Get from your hosting provider
+</Step>
+
+<Step title="Configure Environment">
+  Add to your `.env` file:
+  
+  ```bash
+  EMAIL_PROVIDER="nodemailer"
+  NODEMAILER_HOST="smtp.gmail.com"
+  NODEMAILER_PORT="587"
+  NODEMAILER_SECURE="false"  # true for port 465, false for 587
+  NODEMAILER_USER="your-email@gmail.com"
+  NODEMAILER_PASS="your-app-password"
+  EMAIL_FROM_ADDRESS="your-email@gmail.com"
+  EMAIL_FROM_NAME="Postiz"
+  ```
+</Step>
+
+<Step title="Test Configuration">
+  Restart and test:
+  
+  ```bash
+  docker compose restart backend
+  ```
+  
+  Register a new user to test email delivery.
+</Step>
+
+</Steps>
+
+### Common SMTP Providers
+
+<CodeGroup>
+
+```bash Gmail
+NODEMAILER_HOST="smtp.gmail.com"
+NODEMAILER_PORT="587"
+NODEMAILER_SECURE="false"
+NODEMAILER_USER="your-email@gmail.com"
+NODEMAILER_PASS="your-app-password"  # Not your regular password!
+```
+
+```bash SendGrid
+NODEMAILER_HOST="smtp.sendgrid.net"
+NODEMAILER_PORT="587"
+NODEMAILER_SECURE="false"
+NODEMAILER_USER="apikey"
+NODEMAILER_PASS="your-sendgrid-api-key"
+```
+
+```bash Mailgun
+NODEMAILER_HOST="smtp.mailgun.org"
+NODEMAILER_PORT="587"
+NODEMAILER_SECURE="false"
+NODEMAILER_USER="postmaster@your-domain.mailgun.org"
+NODEMAILER_PASS="your-smtp-password"
+```
+
+```bash Office 365
+NODEMAILER_HOST="smtp.office365.com"
+NODEMAILER_PORT="587"
+NODEMAILER_SECURE="false"
+NODEMAILER_USER="your-email@yourdomain.com"
+NODEMAILER_PASS="your-password"
+```
+
+</CodeGroup>
+
+## Email Service Implementation
+
+The email service (`email.service.ts`) automatically selects the configured provider:
+
+```typescript
+const emailService: EmailInterface;
+
+selectProvider(provider: string) {
+  switch (provider) {
+    case 'resend':
+      return new ResendProvider();
+    case 'nodemailer':
+      return new NodeMailerProvider();
+    default:
+      return new EmptyProvider();
+  }
+}
+```
+
+### Provider Validation
+
+Each provider validates required environment variables on initialization:
+
+```typescript
+// From resend.provider.ts:8
+validateEnvKeys = ['RESEND_API_KEY'];
+```
+
+Missing variables are logged to the console:
+
+```
+Missing environment variable: RESEND_API_KEY
+```
+
+## Email Templates
+
+Postiz sends beautifully formatted HTML emails with automatic styling:
+
+### Template Features
+
+- Gradient background (`#e6f2ff` to `#f0e6ff`)
+- Responsive card layout with backdrop blur
+- Automatic subject line as heading
+- Branded footer with notification preferences link
+- Links to user settings: `{FRONTEND_URL}/settings`
+
+### Email Workflow
+
+Emails are sent through Temporal workflows for reliability:
+
+```typescript
+// From email.service.ts:44-53
+await temporalService.client
+  .getRawClient()
+  .workflow.signalWithStart('sendEmailWorkflow', {
+    taskQueue: 'main',
+    workflowId: 'send_email',
+    signal: 'sendEmail',
+    args: [{ queue: [] }],
+    signalArgs: [{ to, subject, html, replyTo, addTo }],
+    workflowIdConflictPolicy: 'USE_EXISTING',
+  });
+```
+
+<Info>
+  Temporal workflows provide automatic retries (up to 3 attempts) with exponential backoff for failed email deliveries.
+</Info>
+
+## User Activation Behavior
+
+### With Email Provider Configured
+
+1. User registers
+2. Activation email sent to user's email
+3. User must click activation link
+4. Account becomes active
+
+### Without Email Provider (Empty Provider)
+
+1. User registers
+2. Account is automatically activated
+3. No email verification required
+
+<Warning>
+  Disabling email verification (Empty provider) is not recommended for production as it allows anyone to create accounts without email confirmation.
+</Warning>
+
+## Disabling User Registration
+
+To disable new user registration entirely:
+
+```bash
+DISABLE_REGISTRATION=true
+```
+
+This prevents new sign-ups regardless of email configuration.
+
+## Testing Email Delivery
+
+<Steps>
+
+<Step title="Register Test User">
+  Create a new user account with a real email address you can access.
+</Step>
+
+<Step title="Check Email Logs">
+  Monitor backend logs for email sending attempts:
+  
+  ```bash
+  docker compose logs -f backend | grep -i email
+  ```
+</Step>
+
+<Step title="Verify Delivery">
+  Check your inbox (and spam folder) for the activation email.
+</Step>
+
+<Step title="Test Activation Link">
+  Click the activation link in the email to verify the full flow works.
+</Step>
+
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="Emails not sending (Resend)">
+  Check the following:
+  
+  1. **API Key Valid**: Verify your Resend API key starts with `re_` and is active
+  2. **Domain Verified**: Ensure your domain is verified in Resend dashboard
+  3. **Rate Limits**: Check you haven't exceeded Resend's rate limits (check dashboard)
+  4. **Logs**: Check backend logs for detailed error messages
+  
+  ```bash
+  docker compose logs backend | grep -i resend
+  ```
+</Accordion>
+
+<Accordion title="Emails not sending (NodeMailer)">
+  Common issues:
+  
+  1. **Wrong Port**: Use 587 for STARTTLS, 465 for SSL/TLS
+  2. **Authentication Failed**: For Gmail, use App Passwords, not your regular password
+  3. **Firewall**: Ensure your server can make outbound SMTP connections
+  4. **SMTP Disabled**: Some email providers require enabling SMTP access
+  
+  Test SMTP connection:
+  ```bash
+  telnet smtp.gmail.com 587
+  ```
+</Accordion>
+
+<Accordion title="Emails going to spam">
+  Improve deliverability:
+  
+  1. **Verify Domain**: Complete SPF, DKIM, and DMARC setup
+  2. **Warm Up**: Start with low volume and gradually increase
+  3. **Content**: Avoid spam trigger words and excessive links
+  4. **Reply-To**: Set a valid reply-to address
+  5. **Unsubscribe**: Include unsubscribe link (automatic in Postiz emails)
+</Accordion>
+
+<Accordion title="Missing environment variables warning">
+  If you see:
+  ```
+  Missing environment variable: RESEND_API_KEY
+  ```
+  
+  1. Verify the variable is set in `.env`
+  2. Ensure no extra spaces: `RESEND_API_KEY="value"` not `RESEND_API_KEY = "value"`
+  3. Restart the backend service
+  4. Check the variable is loaded: `docker compose exec backend env | grep RESEND`
+</Accordion>
+
+<Accordion title="Email service provider shows 'empty'">
+  If logs show:
+  ```
+  Email service provider: empty
+  ```
+  
+  The `EMAIL_PROVIDER` variable is not set or invalid. Valid values:
+  - `resend`
+  - `nodemailer`
+  
+  Add to `.env` and restart:
+  ```bash
+  EMAIL_PROVIDER="resend"
+  ```
+</Accordion>
+
+## Email Notification Preferences
+
+Users can manage their email notification preferences at:
+
+```
+{FRONTEND_URL}/settings
+```
+
+Each email includes a link to settings:
+
+```html
+You can change your notification preferences in your 
+<a href="{FRONTEND_URL}/settings">account settings</a>.
+```
+
+## Monitoring and Debugging
+
+### Enable Debug Logging
+
+Increase log verbosity to debug email issues:
+
+```bash
+LOG_LEVEL=debug
+```
+
+### Check Email Service Initialization
+
+```bash
+docker compose logs backend | grep "Email service provider"
+```
+
+Expected output:
+```
+Email service provider: resend
+```
+
+### Monitor Email Queue
+
+Emails are processed asynchronously through Temporal. Check workflow status:
+
+```bash
+docker compose logs orchestrator | grep sendEmail
+```
+
+## Rate Limits
+
+### Resend
+
+- **Free tier**: 100 emails/day
+- **Paid tier**: Based on your plan
+- Automatic retry with exponential backoff
+
+### NodeMailer
+
+Rate limits depend on your SMTP provider:
+
+- **Gmail**: 500 emails/day (free), 2000/day (Google Workspace)
+- **SendGrid**: Based on your plan
+- **Mailgun**: Based on your plan
+
+<Tip>
+  For high-volume deployments, consider using Resend or a dedicated email service provider.
+</Tip>
+
+## Security Best Practices
+
+<Warning>
+  Never commit email credentials to version control. Use environment variables and secure secrets management.
+</Warning>
+
+- Store API keys and passwords in environment variables
+- Use App Passwords for Gmail, never your main password
+- Rotate API keys regularly
+- Monitor email logs for suspicious activity
+- Implement rate limiting on user registration
+- Use HTTPS for all email links
+
+## Next Steps
+
+After configuring email:
+
+- [OAuth Apps](/configuration/oauth-apps) - Set up social media integrations
+- [AI Integration](/configuration/ai-integration) - Enable AI features
+- [Billing Configuration](/configuration/billing-stripe) - Set up Stripe payments

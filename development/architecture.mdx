@@ -1,0 +1,189 @@
+---
+title: System Architecture Overview
+description: Understanding the overall architecture of Postiz
+---
+
+## Overview
+
+Postiz is a comprehensive social media scheduling platform built as a modern monorepo application. It enables users to schedule posts across 28+ social media channels, manage their content calendar, track analytics, and collaborate with teams.
+
+## Core Capabilities
+
+- **Post Scheduling**: Schedule posts to multiple social media platforms
+- **Calendar Management**: Visual calendar view for managing scheduled content
+- **Analytics Dashboard**: Track performance across all connected channels
+- **Team Management**: Collaborate with team members and manage permissions
+- **Media Library**: Centralized media storage and management
+- **OAuth Integrations**: Connect to 28+ social media platforms
+- **Background Jobs**: Temporal-based workflow orchestration
+
+## High-Level Architecture
+
+<Note>
+Postiz follows a distributed architecture pattern with clear separation of concerns between the API layer, orchestration layer, and presentation layer.
+</Note>
+
+### Application Layers
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Frontend (Vite + React)              │
+│          Next.js App Router │ SWR │ Tailwind CSS        │
+└─────────────────────────────────────────────────────────┘
+                            │
+                            ↓
+┌─────────────────────────────────────────────────────────┐
+│                   Backend API (NestJS)                  │
+│    Controllers → Services → Repositories → Database      │
+└─────────────────────────────────────────────────────────┘
+                            │
+                            ↓
+┌─────────────────────────────────────────────────────────┐
+│              Orchestrator (Temporal + NestJS)           │
+│         Workflows │ Activities │ Background Jobs        │
+└─────────────────────────────────────────────────────────┘
+                            │
+                            ↓
+┌─────────────────────────────────────────────────────────┐
+│                PostgreSQL Database (Prisma)             │
+│              Redis Cache │ S3 Storage                   │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Key Components
+
+<Steps>
+  <Step title="Frontend Layer">
+    Built with Vite and React using Next.js App Router for routing. Uses SWR for data fetching and Tailwind CSS for styling. All UI components are custom-built without external component libraries.
+  </Step>
+  
+  <Step title="Backend API Layer">
+    NestJS-based REST API following a strict Controller → Service → Repository pattern. Handles all business logic, authentication, and integration management.
+  </Step>
+  
+  <Step title="Orchestrator Layer">
+    Temporal-based workflow engine for background job processing. Manages post scheduling, token refresh, email sending, and other asynchronous tasks.
+  </Step>
+  
+  <Step title="Data Layer">
+    PostgreSQL database managed via Prisma ORM. Redis for caching and rate limiting. AWS S3 or compatible storage for media files.
+  </Step>
+</Steps>
+
+## Design Principles
+
+### Separation of Concerns
+
+The architecture strictly separates:
+- **Presentation logic** (Frontend)
+- **Business logic** (Backend Services)
+- **Data access** (Repositories)
+- **Background processing** (Orchestrator)
+
+### Shared Libraries
+
+Common functionality is extracted into shared libraries:
+
+- `libraries/nestjs-libraries` - Backend services, integrations, database access
+- `libraries/react-shared-libraries` - Frontend components and utilities
+- `libraries/helpers` - Cross-platform utilities and helpers
+
+<Info>
+Shared libraries enable code reuse across backend, orchestrator, and frontend applications while maintaining clear boundaries.
+</Info>
+
+### Integration Architecture
+
+Social media integrations follow an abstract provider pattern:
+
+```typescript
+SocialAbstract (Base Class)
+    ↓
+XProvider, FacebookProvider, LinkedInProvider, etc.
+    ↓
+IntegrationManager (Orchestration)
+    ↓
+Temporal Workflows (Scheduling)
+```
+
+Each provider implements:
+- OAuth authentication flow
+- Post publishing logic
+- Analytics retrieval
+- Token refresh mechanisms
+
+## Data Flow
+
+### Post Scheduling Flow
+
+<Steps>
+  <Step title="User creates post">
+    Frontend sends post data to Backend API
+  </Step>
+  
+  <Step title="Backend validates and stores">
+    Controller → Service validates data → Repository saves to database
+  </Step>
+  
+  <Step title="Orchestrator schedules">
+    Temporal workflow created for scheduled time
+  </Step>
+  
+  <Step title="Workflow executes">
+    At scheduled time, workflow executes activities to publish post
+  </Step>
+  
+  <Step title="Provider publishes">
+    Integration provider publishes to social media platform via API
+  </Step>
+</Steps>
+
+### Authentication Flow
+
+1. **User Registration/Login**: JWT-based authentication with cookie storage
+2. **OAuth Integration**: OAuth 2.0 flow for connecting social media accounts
+3. **Token Management**: Automatic token refresh via Temporal workflows
+4. **Permission Management**: CASL-based authorization with role-based access control
+
+## Scalability Considerations
+
+<Warning>
+The orchestrator uses Temporal for reliable job execution with built-in retry mechanisms, ensuring posts are published even if temporary failures occur.
+</Warning>
+
+### Horizontal Scaling
+
+- **Frontend**: Static asset serving via CDN
+- **Backend**: Stateless API servers behind load balancer
+- **Orchestrator**: Multiple Temporal workers for parallel job processing
+- **Database**: Read replicas and connection pooling
+
+### Performance Optimizations
+
+- Redis caching for frequently accessed data
+- SWR for optimistic UI updates and client-side caching
+- Rate limiting via Redis-backed throttler
+- Concurrent job processing with configurable limits per provider
+
+## Technology Stack Summary
+
+| Layer | Technologies |
+|-------|-------------|
+| **Frontend** | Vite, React 18, Next.js 14, SWR, Tailwind CSS 3 |
+| **Backend** | NestJS 10, Node.js 22, Express |
+| **Orchestrator** | Temporal, NestJS 10 |
+| **Database** | PostgreSQL, Prisma 6.5, Redis |
+| **Storage** | AWS S3, Transloadit |
+| **Auth** | JWT, OAuth 2.0, CASL |
+| **Monitoring** | Sentry |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Monorepo Structure" icon="folder-tree" href="/development/monorepo-structure">
+    Learn about the monorepo organization and workspace structure
+  </Card>
+  <Card title="Tech Stack" icon="layer-group" href="/development/tech-stack">
+    Deep dive into the technologies used in Postiz
+  </Card>
+</CardGroup>

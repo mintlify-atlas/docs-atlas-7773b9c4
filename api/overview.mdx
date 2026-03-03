@@ -1,0 +1,109 @@
+---
+title: 'API Overview'
+description: 'Getting started with the Postiz Public API'
+---
+
+## Welcome to Postiz API
+
+The Postiz Public API enables you to programmatically manage your social media content across 28+ platforms. Schedule posts, manage integrations, upload media, and more.
+
+## Base URL
+
+All API endpoints are relative to:
+
+```
+https://api.postiz.com
+```
+
+For self-hosted instances, use your custom domain.
+
+## API Version
+
+The current API version is `v1`. All endpoints are prefixed with `/public/v1/`.
+
+```
+https://api.postiz.com/public/v1/posts
+```
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Schedule Posts" icon="calendar">
+    Create and schedule posts across multiple social media platforms simultaneously
+  </Card>
+  <Card title="Media Management" icon="image">
+    Upload images, videos, and other media files for your posts
+  </Card>
+  <Card title="Integration Control" icon="plug">
+    List and manage your connected social media accounts
+  </Card>
+  <Card title="Rate Limited" icon="gauge">
+    30 requests per hour by default to ensure optimal performance
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+1. **Get your API key** from the Postiz dashboard under Settings → API Keys
+2. **Authenticate** your requests by including the API key in the `Authorization` header
+3. **Make your first request** to create a post or list integrations
+
+```bash
+curl https://api.postiz.com/public/v1/integrations \
+  -H "Authorization: YOUR_API_KEY"
+```
+
+## SDKs and Tools
+
+Postiz provides official SDKs and CLI tools to make integration easier:
+
+- **Node.js SDK**: `@postiz/node` - Full TypeScript support
+- **CLI Tool**: `postiz` - Command-line interface for all API operations
+
+## Response Format
+
+All API responses are returned in JSON format:
+
+```json
+{
+  "id": "post-123",
+  "status": "scheduled",
+  "date": "2024-12-31T12:00:00Z"
+}
+```
+
+## Error Handling
+
+The API uses standard HTTP status codes:
+
+- `200` - Success
+- `400` - Bad Request (validation error)
+- `401` - Unauthorized (invalid API key)
+- `404` - Not Found
+- `429` - Too Many Requests (rate limit exceeded)
+- `500` - Internal Server Error
+
+Error responses include a descriptive message:
+
+```json
+{
+  "msg": "Invalid API key"
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Learn how to authenticate your API requests
+  </Card>
+  <Card title="Create Your First Post" icon="paper-plane" href="/api/posts/create-post">
+    Schedule a post to your social media accounts
+  </Card>
+  <Card title="Rate Limits" icon="gauge" href="/api/rate-limits">
+    Understand API rate limiting policies
+  </Card>
+  <Card title="Node.js SDK" icon="node" href="/api/sdk/nodejs-sdk">
+    Use the official Node.js SDK
+  </Card>
+</CardGroup>

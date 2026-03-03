@@ -1,0 +1,630 @@
+---
+title: Database Setup
+description: PostgreSQL and Redis configuration guide for Postiz
+---
+
+# Database Setup
+
+Postiz requires two database services: PostgreSQL for persistent data storage and Redis for caching and session management.
+
+## PostgreSQL Setup
+
+Postiz uses PostgreSQL as its primary database with Prisma as the ORM.
+
+### Docker Compose (Recommended)
+
+The easiest way to run PostgreSQL is using the included Docker Compose configuration:
+
+```yaml docker-compose.yaml
+postiz-postgres:
+  image: postgres:17-alpine
+  container_name: postiz-postgres
+  restart: always
+  environment:
+    POSTGRES_PASSWORD: postiz-password
+    POSTGRES_USER: postiz-user
+    POSTGRES_DB: postiz-db-local
+  volumes:
+    - postgres-volume:/var/lib/postgresql/data
+  networks:
+    - postiz-network
+  healthcheck:
+    test: pg_isready -U postiz-user -d postiz-db-local
+    interval: 10s
+    timeout: 3s
+    retries: 3
+```
+
+<Warning>
+**Production Security**: Change the default credentials!
+
+```yaml
+environment:
+  POSTGRES_PASSWORD: your-strong-random-password
+  POSTGRES_USER: your-username
+  POSTGRES_DB: postiz-production
+```
+</Warning>
+
+### Standalone PostgreSQL Installation
+
+If you prefer to run PostgreSQL outside of Docker:
+
+<Steps>
+  <Step title="Install PostgreSQL">
+    <CodeGroup>
+    ```bash Ubuntu/Debian
+    sudo apt update
+    sudo apt install postgresql postgresql-contrib
+    ```
+    
+    ```bash CentOS/RHEL
+    sudo dnf install postgresql-server postgresql-contrib
+    sudo postgresql-setup --initdb
+    sudo systemctl start postgresql
+    ```
+    
+    ```bash macOS
+    brew install postgresql@17
+    brew services start postgresql@17
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Create Database and User">
+    ```bash
+    sudo -u postgres psql
+    ```
+    
+    ```sql
+    CREATE DATABASE postiz;
+    CREATE USER postiz_user WITH ENCRYPTED PASSWORD 'your-secure-password';
+    GRANT ALL PRIVILEGES ON DATABASE postiz TO postiz_user;
+    \q
+    ```
+  </Step>
+  
+  <Step title="Configure Connection">
+    Update your `.env` file:
+    
+    ```bash
+    DATABASE_URL="postgresql://postiz_user:your-secure-password@localhost:5432/postiz"
+    ```
+  </Step>
+</Steps>
+
+### PostgreSQL Version
+
+<Info>
+Postiz is tested with PostgreSQL 17, but should work with PostgreSQL 12+.
+</Info>
+
+Recommended version: **PostgreSQL 17 Alpine** (for Docker deployments)
+
+### Connection String Format
+
+The PostgreSQL connection string follows this format:
+
+```
+postgresql://[user]:[password]@[host]:[port]/[database]?[options]
+```
+
+**Examples:**
+
+```bash
+# Docker Compose
+DATABASE_URL="postgresql://postiz-user:postiz-password@postiz-postgres:5432/postiz-db-local"
+
+# Localhost
+DATABASE_URL="postgresql://postiz_user:password@localhost:5432/postiz"
+
+# Remote Server
+DATABASE_URL="postgresql://user:password@db.example.com:5432/postiz"
+
+# With SSL
+DATABASE_URL="postgresql://user:password@db.example.com:5432/postiz?sslmode=require"
+
+# With connection pooling
+DATABASE_URL="postgresql://user:password@localhost:5432/postiz?connection_limit=10"
+```
+
+### Database Configuration
+
+#### Recommended PostgreSQL Settings
+
+For production deployments, optimize PostgreSQL settings in `postgresql.conf`:
+
+```conf postgresql.conf
+# Memory Settings
+shared_buffers = 256MB
+effective_cache_size = 1GB
+maintenance_work_mem = 64MB
+work_mem = 16MB
+
+# Connection Settings
+max_connections = 100
+
+# Write-Ahead Log
+wal_buffers = 16MB
+checkpoint_completion_target = 0.9
+
+# Query Planner
+random_page_cost = 1.1
+effective_io_concurrency = 200
+```
+
+#### Connection Pooling
+
+For high-traffic deployments, consider using PgBouncer:
+
+```ini pgbouncer.ini
+[databases]
+postiz = host=localhost port=5432 dbname=postiz
+
+[pgbouncer]
+listen_port = 6432
+listen_addr = *
+auth_type = md5
+auth_file = /etc/pgbouncer/userlist.txt
+pool_mode = transaction
+max_client_conn = 1000
+default_pool_size = 20
+```
+
+### Database Migrations
+
+Postiz uses Prisma for database migrations. The application automatically runs migrations on startup.
+
+<Note>
+No manual migration steps are required. Postiz handles schema creation and updates automatically.
+</Note>
+
+#### Manual Migration (Advanced)
+
+If you need to run migrations manually:
+
+```bash
+# Inside the Postiz container
+docker compose exec postiz npx prisma migrate deploy
+
+# Check migration status
+docker compose exec postiz npx prisma migrate status
+```
+
+### Backup and Restore
+
+#### Backup Database
+
+<CodeGroup>
+```bash Docker Compose
+# Backup to file
+docker compose exec postiz-postgres pg_dump -U postiz-user postiz-db-local > backup.sql
+
+# Backup with compression
+docker compose exec postiz-postgres pg_dump -U postiz-user postiz-db-local | gzip > backup.sql.gz
+
+# Backup to custom format (recommended)
+docker compose exec postiz-postgres pg_dump -U postiz-user -Fc postiz-db-local > backup.dump
+```
+
+```bash Standalone
+# Standard backup
+pg_dump -U postiz_user -h localhost postiz > backup.sql
+
+# Compressed backup
+pg_dump -U postiz_user -h localhost postiz | gzip > backup.sql.gz
+
+# Custom format
+pg_dump -U postiz_user -h localhost -Fc postiz > backup.dump
+```
+</CodeGroup>
+
+#### Restore Database
+
+<CodeGroup>
+```bash Docker Compose
+# From SQL file
+docker compose exec -T postiz-postgres psql -U postiz-user postiz-db-local < backup.sql
+
+# From compressed file
+gunzip -c backup.sql.gz | docker compose exec -T postiz-postgres psql -U postiz-user postiz-db-local
+
+# From custom format
+docker compose exec postiz-postgres pg_restore -U postiz-user -d postiz-db-local backup.dump
+```
+
+```bash Standalone
+# From SQL file
+psql -U postiz_user postiz < backup.sql
+
+# From compressed file
+gunzip -c backup.sql.gz | psql -U postiz_user postiz
+
+# From custom format
+pg_restore -U postiz_user -d postiz backup.dump
+```
+</CodeGroup>
+
+#### Automated Backups
+
+Create a backup script:
+
+```bash backup.sh
+#!/bin/bash
+BACKUP_DIR="/backups/postiz"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+mkdir -p "$BACKUP_DIR"
+
+# Backup database
+docker compose exec -T postiz-postgres pg_dump -U postiz-user -Fc postiz-db-local > "$BACKUP_DIR/postiz_$DATE.dump"
+
+# Keep only last 30 days
+find "$BACKUP_DIR" -name "postiz_*.dump" -mtime +30 -delete
+
+echo "Backup completed: postiz_$DATE.dump"
+```
+
+Schedule with cron:
+
+```cron
+# Daily backup at 2 AM
+0 2 * * * /path/to/backup.sh >> /var/log/postiz-backup.log 2>&1
+```
+
+## Redis Setup
+
+Redis is used for caching, session storage, and job queues.
+
+### Docker Compose (Recommended)
+
+```yaml docker-compose.yaml
+postiz-redis:
+  image: redis:7.2
+  container_name: postiz-redis
+  restart: always
+  healthcheck:
+    test: redis-cli ping
+    interval: 10s
+    timeout: 3s
+    retries: 3
+  volumes:
+    - postiz-redis-data:/data
+  networks:
+    - postiz-network
+```
+
+### Standalone Redis Installation
+
+<Steps>
+  <Step title="Install Redis">
+    <CodeGroup>
+    ```bash Ubuntu/Debian
+    sudo apt update
+    sudo apt install redis-server
+    ```
+    
+    ```bash CentOS/RHEL
+    sudo dnf install redis
+    sudo systemctl start redis
+    ```
+    
+    ```bash macOS
+    brew install redis
+    brew services start redis
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Configure Redis">
+    Edit `/etc/redis/redis.conf`:
+    
+    ```conf
+    # Bind to localhost only (for security)
+    bind 127.0.0.1
+    
+    # Enable persistence
+    save 900 1
+    save 300 10
+    save 60 10000
+    
+    # Set max memory
+    maxmemory 256mb
+    maxmemory-policy allkeys-lru
+    ```
+  </Step>
+  
+  <Step title="Configure Connection">
+    Update your `.env` file:
+    
+    ```bash
+    REDIS_URL="redis://localhost:6379"
+    ```
+  </Step>
+</Steps>
+
+### Redis Connection String
+
+The Redis connection string format:
+
+```
+redis://[password@]host[:port][/database]
+```
+
+**Examples:**
+
+```bash
+# Docker Compose
+REDIS_URL="redis://postiz-redis:6379"
+
+# Localhost
+REDIS_URL="redis://localhost:6379"
+
+# With password
+REDIS_URL="redis://password@localhost:6379"
+
+# Specific database
+REDIS_URL="redis://localhost:6379/0"
+
+# Redis Sentinel
+REDIS_URL="redis://sentinel-host:26379?sentinelMasterId=mymaster"
+```
+
+### Redis Configuration
+
+#### Production Settings
+
+For production deployments, configure Redis with these settings:
+
+```conf redis.conf
+# Security
+requirepass your-strong-redis-password
+
+# Persistence
+save 900 1
+save 300 10
+save 60 10000
+appendonly yes
+appendfsync everysec
+
+# Memory Management
+maxmemory 512mb
+maxmemory-policy allkeys-lru
+
+# Performance
+tcp-backlog 511
+timeout 0
+tcp-keepalive 300
+
+# Replication (if using replicas)
+repl-diskless-sync yes
+repl-diskless-sync-delay 5
+```
+
+#### High Availability with Redis Sentinel
+
+For production deployments requiring high availability:
+
+```conf sentinel.conf
+sentinel monitor postiz-master 127.0.0.1 6379 2
+sentinel auth-pass postiz-master your-redis-password
+sentinel down-after-milliseconds postiz-master 5000
+sentinel parallel-syncs postiz-master 1
+sentinel failover-timeout postiz-master 10000
+```
+
+### Redis Monitoring
+
+#### Check Redis Status
+
+```bash
+# Docker Compose
+docker compose exec postiz-redis redis-cli ping
+docker compose exec postiz-redis redis-cli info
+
+# Standalone
+redis-cli ping
+redis-cli info
+```
+
+#### Monitor Memory Usage
+
+```bash
+redis-cli info memory
+```
+
+#### View Connected Clients
+
+```bash
+redis-cli client list
+```
+
+## Database Monitoring
+
+### PostgreSQL Monitoring
+
+#### Check Active Connections
+
+```sql
+SELECT count(*) FROM pg_stat_activity;
+```
+
+#### View Database Size
+
+```sql
+SELECT pg_size_pretty(pg_database_size('postiz'));
+```
+
+#### Check Table Sizes
+
+```sql
+SELECT 
+  schemaname,
+  tablename,
+  pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
+FROM pg_tables
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
+LIMIT 10;
+```
+
+#### Monitor Query Performance
+
+```sql
+SELECT 
+  pid,
+  now() - pg_stat_activity.query_start AS duration,
+  query,
+  state
+FROM pg_stat_activity
+WHERE state != 'idle'
+ORDER BY duration DESC;
+```
+
+### Health Checks
+
+The Docker Compose configuration includes automatic health checks:
+
+```yaml
+# PostgreSQL health check
+healthcheck:
+  test: pg_isready -U postiz-user -d postiz-db-local
+  interval: 10s
+  timeout: 3s
+  retries: 3
+
+# Redis health check
+healthcheck:
+  test: redis-cli ping
+  interval: 10s
+  timeout: 3s
+  retries: 3
+```
+
+Postiz won't start until both databases are healthy.
+
+## Troubleshooting
+
+### PostgreSQL Issues
+
+#### Connection Refused
+
+```bash
+# Check if PostgreSQL is running
+docker compose ps postiz-postgres
+
+# Check PostgreSQL logs
+docker compose logs postiz-postgres
+
+# Verify network connectivity
+docker compose exec postiz ping postiz-postgres
+```
+
+#### Authentication Failed
+
+<Warning>
+Ensure the `DATABASE_URL` credentials match the PostgreSQL environment variables.
+</Warning>
+
+```bash
+# Test connection manually
+docker compose exec postiz-postgres psql -U postiz-user -d postiz-db-local
+```
+
+#### Out of Disk Space
+
+```bash
+# Check volume usage
+docker system df -v
+
+# Clean up old data
+docker volume prune
+```
+
+### Redis Issues
+
+#### Connection Refused
+
+```bash
+# Check if Redis is running
+docker compose ps postiz-redis
+
+# Check Redis logs
+docker compose logs postiz-redis
+
+# Test connection
+docker compose exec postiz-redis redis-cli ping
+```
+
+#### Out of Memory
+
+```bash
+# Check memory usage
+docker compose exec postiz-redis redis-cli info memory
+
+# Flush cache (caution: clears all data)
+docker compose exec postiz-redis redis-cli FLUSHALL
+```
+
+#### High Memory Usage
+
+Configure memory limits:
+
+```yaml docker-compose.yaml
+postiz-redis:
+  command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+```
+
+## Performance Tuning
+
+### PostgreSQL Optimization
+
+<Steps>
+  <Step title="Analyze Slow Queries">
+    Enable query logging:
+    
+    ```conf postgresql.conf
+    log_min_duration_statement = 1000  # Log queries slower than 1s
+    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    ```
+  </Step>
+  
+  <Step title="Add Indexes">
+    Postiz creates necessary indexes automatically, but you can add custom indexes:
+    
+    ```sql
+    CREATE INDEX idx_posts_created_at ON posts(created_at DESC);
+    CREATE INDEX idx_posts_user_id ON posts(user_id);
+    ```
+  </Step>
+  
+  <Step title="Vacuum Database">
+    Regular maintenance:
+    
+    ```sql
+    VACUUM ANALYZE;
+    ```
+  </Step>
+</Steps>
+
+### Redis Optimization
+
+- Use `maxmemory-policy allkeys-lru` to evict old keys automatically
+- Enable persistence with `appendonly yes` for data durability
+- Monitor memory usage and adjust `maxmemory` as needed
+- Use Redis Sentinel for high availability
+
+## Next Steps
+
+<Steps>
+  <Step title="Configure Authentication">
+    Set up [OAuth authentication](/self-hosting/authentication) for social media platforms
+  </Step>
+  
+  <Step title="Configure Storage">
+    Set up [storage configuration](/self-hosting/storage-configuration) for media uploads
+  </Step>
+  
+  <Step title="Review Environment Variables">
+    Check the complete [environment variables reference](/self-hosting/environment-variables)
+  </Step>
+</Steps>

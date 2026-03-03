@@ -1,0 +1,510 @@
+---
+title: 'Analytics & Performance Tracking'
+description: 'Track post performance, engagement metrics, and analytics across all connected platforms'
+---
+
+## Overview
+
+Postiz Analytics provides comprehensive insights into your social media performance. Track engagement, reach, impressions, and other key metrics across all your connected platforms from a unified dashboard.
+
+## Supported Platforms
+
+Analytics are available for the following platforms:
+
+<CardGroup cols={3}>
+  <Card title="Facebook" icon="facebook">
+    Pages, reach, engagement, post clicks
+  </Card>
+  <Card title="Instagram" icon="instagram">
+    Posts, stories, reach, impressions, engagement
+  </Card>
+  <Card title="LinkedIn" icon="linkedin">
+    Page analytics, impressions, engagement, clicks
+  </Card>
+  <Card title="X (Twitter)" icon="x-twitter">
+    Impressions, engagement, likes, retweets
+  </Card>
+  <Card title="YouTube" icon="youtube">
+    Views, watch time, engagement, subscriber growth
+  </Card>
+  <Card title="TikTok" icon="tiktok">
+    Views, likes, comments, shares
+  </Card>
+  <Card title="Pinterest" icon="pinterest">
+    Impressions, saves, clicks, engagement
+  </Card>
+  <Card title="Google Business" icon="google">
+    Profile views, search queries, actions
+  </Card>
+  <Card title="Threads" icon="threads">
+    Views, likes, replies, reposts
+  </Card>
+</CardGroup>
+
+```typescript
+// Supported platforms for analytics
+const allowedIntegrations = [
+  'facebook',
+  'instagram', 
+  'instagram-standalone',
+  'linkedin-page',
+  'tiktok',
+  'youtube',
+  'gmb',
+  'pinterest',
+  'threads',
+  'x'
+];
+```
+
+## Analytics Dashboard
+
+### Accessing Analytics
+
+Navigate to the Analytics section from the main menu to view your performance metrics.
+
+```typescript
+// Analytics API endpoint
+GET /analytics/:integration?date=<days>
+
+// Fetch analytics for a specific integration
+const analytics = await fetch(
+  `/analytics/${integration.id}?date=${days}`
+).json();
+```
+
+### Time Range Selection
+
+Choose from different time ranges based on platform support:
+
+<Tabs>
+  <Tab title="7 Days">
+    Available for all supported platforms. Best for tracking short-term trends.
+    
+    ```typescript
+    const options = [{
+      key: 7,
+      value: '7 Days'
+    }];
+    ```
+  </Tab>
+  
+  <Tab title="30 Days">
+    Available for most platforms. Ideal for monthly performance reviews.
+    
+    ```typescript
+    // Available for: Facebook, Instagram, LinkedIn, Pinterest, 
+    // YouTube, Threads, GMB, X, TikTok
+    const options = [{
+      key: 30,
+      value: '30 Days'
+    }];
+    ```
+  </Tab>
+  
+  <Tab title="90 Days">
+    Available for select platforms. Great for quarterly analysis.
+    
+    ```typescript
+    // Available for: Facebook, LinkedIn, Pinterest, YouTube, X, GMB
+    const options = [{
+      key: 90,
+      value: '90 Days'
+    }];
+    ```
+  </Tab>
+</Tabs>
+
+## Platform-Specific Metrics
+
+### Facebook Analytics
+
+<Accordion title="Available Metrics">
+  - **Page Impressions** - Total times your page was viewed
+  - **Post Reach** - Unique users who saw your posts
+  - **Post Engagement** - Likes, comments, shares, and clicks
+  - **Page Likes** - New likes during the period
+  - **Post Clicks** - Clicks on your posts
+  
+  ```typescript
+  interface FacebookMetrics {
+    impressions: number;
+    reach: number;
+    engagement: number;
+    likes: number;
+    clicks: number;
+    timeSeriesData: Array<{
+      date: string;
+      value: number;
+    }>;
+  }
+  ```
+</Accordion>
+
+### Instagram Analytics
+
+<Accordion title="Available Metrics">
+  - **Impressions** - Total times your content was viewed
+  - **Reach** - Unique accounts reached
+  - **Profile Views** - Profile visit count
+  - **Engagement** - Likes, comments, saves, shares
+  - **Follower Growth** - New followers gained
+  
+  ```typescript
+  interface InstagramMetrics {
+    impressions: number;
+    reach: number;
+    profileViews: number;
+    engagement: number;
+    followerGrowth: number;
+    topPosts: Array<{
+      id: string;
+      mediaUrl: string;
+      likes: number;
+      comments: number;
+    }>;
+  }
+  ```
+</Accordion>
+
+### LinkedIn Analytics
+
+<Accordion title="Available Metrics">
+  - **Impressions** - Times your content was shown
+  - **Clicks** - Clicks on your content
+  - **Engagement** - Likes, comments, shares
+  - **Follower Growth** - New followers
+  - **Engagement Rate** - Engagement percentage
+  
+  ```typescript
+  interface LinkedInMetrics {
+    impressions: number;
+    clicks: number;
+    engagement: number;
+    followers: number;
+    engagementRate: number;
+  }
+  ```
+</Accordion>
+
+### X (Twitter) Analytics
+
+<Note>
+  X analytics require additional configuration and may have rate limits.
+</Note>
+
+```typescript
+interface XMetrics {
+  impressions: number;
+  engagements: number;
+  likes: number;
+  retweets: number;
+  replies: number;
+  urlClicks: number;
+  profileClicks: number;
+}
+```
+
+## Post-Level Analytics
+
+View detailed analytics for individual posts:
+
+### Accessing Post Analytics
+
+```typescript
+// Click on any published post in the calendar
+const openStatistics = (postId: string) => {
+  modal.openModal({
+    title: 'Statistics',
+    children: <StatisticsModal postId={postId} />
+  });
+};
+
+// API endpoint
+GET /analytics/post/:postId?date=<timestamp>
+
+const postAnalytics = await fetch(
+  `/analytics/post/${postId}?date=${timestamp}`
+).json();
+```
+
+### Post Statistics Modal
+
+<Steps>
+  <Step title="Open Post Statistics">
+    Click the statistics icon on any published post in the calendar.
+  </Step>
+  
+  <Step title="View Metrics">
+    See platform-specific metrics for that individual post:
+    
+    ```typescript
+    interface PostStatistics {
+      id: string;
+      publishDate: string;
+      platform: string;
+      content: string;
+      metrics: {
+        impressions?: number;
+        reach?: number;
+        engagement?: number;
+        likes?: number;
+        comments?: number;
+        shares?: number;
+        clicks?: number;
+        saves?: number;
+      };
+    }
+    ```
+  </Step>
+  
+  <Step title="Compare Performance">
+    View how this post performs compared to your average metrics.
+  </Step>
+</Steps>
+
+## Analytics Components
+
+### Channel Analytics Sidebar
+
+The analytics page features a collapsible sidebar showing all channels with available analytics:
+
+```typescript
+const PlatformAnalytics = () => {
+  const [current, setCurrent] = useState(0);
+  const [key, setKey] = useState(7); // Default to 7 days
+  
+  const { data } = useSWR('analytics-list', async () => {
+    const integrations = await fetch('/integrations/list').json();
+    return integrations.filter(f => 
+      allowedIntegrations.includes(f.identifier)
+    );
+  });
+  
+  return (
+    <>
+      <Sidebar channels={data} current={current} onSelect={setCurrent} />
+      <AnalyticsView 
+        integration={data[current]} 
+        dateRange={key} 
+      />
+    </>
+  );
+};
+```
+
+### Rendering Analytics Charts
+
+```typescript
+import { RenderAnalytics } from '@gitroom/frontend/components/platform-analytics/render.analytics';
+
+const AnalyticsView = ({ integration, date }) => {
+  return (
+    <div className="flex-1">
+      <RenderAnalytics 
+        integration={integration} 
+        date={date} 
+      />
+    </div>
+  );
+};
+```
+
+## Channel Status Indicators
+
+Channels display status indicators in the analytics sidebar:
+
+<Tabs>
+  <Tab title="Active Channel">
+    Channel is connected and analytics are available.
+    
+    ```typescript
+    <div className="opacity-100">
+      <ChannelIcon integration={integration} />
+    </div>
+    ```
+  </Tab>
+  
+  <Tab title="Refresh Needed">
+    Channel needs to be reconnected to fetch analytics.
+    
+    ```typescript
+    {integration.refreshNeeded && (
+      <div className="bg-red-500 w-[15px] h-[15px] rounded-full">
+        !
+      </div>
+    )}
+    ```
+  </Tab>
+  
+  <Tab title="Disabled Channel">
+    Channel is disabled and analytics are unavailable.
+    
+    ```typescript
+    <div className="opacity-50">
+      <ChannelIcon integration={integration} />
+    </div>
+    ```
+  </Tab>
+</Tabs>
+
+## Refreshing Analytics Data
+
+Analytics data is cached and refreshed periodically:
+
+```typescript
+const { data, mutate } = useSWR(
+  `analytics-${integration.id}-${dateRange}`,
+  () => fetchAnalytics(integration.id, dateRange),
+  {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    refreshInterval: 300000 // Refresh every 5 minutes
+  }
+);
+
+// Manual refresh
+const refreshAnalytics = () => {
+  mutate();
+};
+```
+
+## Exporting Analytics Data
+
+<Note>
+  Export functionality is coming soon. Currently, you can view analytics in the dashboard.
+</Note>
+
+## Integration Service
+
+Analytics are fetched through the integration service:
+
+```typescript
+// Backend: analytics.controller.ts
+@Get('/:integration')
+async getIntegration(
+  @GetOrgFromRequest() org: Organization,
+  @Param('integration') integration: string,
+  @Query('date') date: string
+) {
+  return this._integrationService.checkAnalytics(
+    org, 
+    integration, 
+    date
+  );
+}
+
+@Get('/post/:postId')
+async getPostAnalytics(
+  @GetOrgFromRequest() org: Organization,
+  @Param('postId') postId: string,
+  @Query('date') date: string
+) {
+  return this._postsService.checkPostAnalytics(
+    org.id, 
+    postId, 
+    +date
+  );
+}
+```
+
+## Error Handling
+
+Handle analytics errors gracefully:
+
+```typescript
+const fetchAnalytics = async () => {
+  try {
+    const response = await fetch(
+      `/analytics/${integration.id}?date=${days}`
+    );
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch analytics');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Analytics error:', error);
+    toaster.show('Failed to load analytics', 'error');
+    return null;
+  }
+};
+```
+
+<Warning>
+  Some platforms have rate limits on analytics API calls. If you see errors, try again after a few minutes.
+</Warning>
+
+## Analytics Limitations
+
+<Accordion title="Platform Limitations">
+  - **X (Twitter)** - May require premium API access for detailed analytics
+  - **Instagram** - Business or Creator account required
+  - **TikTok** - Business account required for analytics
+  - **Historical Data** - Most platforms limit historical data to 90 days
+  - **Real-time** - Analytics may have a 24-48 hour delay
+</Accordion>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Regular Monitoring" icon="chart-line">
+    Check analytics weekly to track trends and adjust your strategy.
+  </Card>
+  
+  <Card title="Compare Time Periods" icon="calendar-range">
+    Use different time ranges to identify seasonal patterns.
+  </Card>
+  
+  <Card title="Track Top Posts" icon="star">
+    Identify your best-performing content and create similar posts.
+  </Card>
+  
+  <Card title="Monitor Engagement Rate" icon="heart">
+    Focus on engagement rate rather than just follower count.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<Tabs>
+  <Tab title="No Analytics Available">
+    1. Ensure the channel is properly connected
+    2. Check if the platform supports analytics
+    3. Verify you have the required account type (Business/Creator)
+    4. Try refreshing the connection
+  </Tab>
+  
+  <Tab title="Analytics Not Updating">
+    1. Analytics may have a 24-48 hour delay
+    2. Check platform API status
+    3. Verify rate limits haven't been exceeded
+    4. Try manual refresh
+  </Tab>
+  
+  <Tab title="Missing Metrics">
+    1. Some metrics require specific platform features
+    2. Check platform API version
+    3. Ensure proper permissions are granted
+  </Tab>
+</Tabs>
+
+## API Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/analytics/:integration` | GET | Get channel analytics |
+| `/analytics/post/:postId` | GET | Get post-specific analytics |
+| `/integrations/list` | GET | List integrations with analytics |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Post Scheduling" icon="calendar" href="/features/scheduling">
+    Optimize posting times based on analytics insights
+  </Card>
+  <Card title="AI Features" icon="sparkles" href="/features/ai-features">
+    Use AI to create content optimized for engagement
+  </Card>
+</CardGroup>

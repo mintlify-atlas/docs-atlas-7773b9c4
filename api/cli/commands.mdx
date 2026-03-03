@@ -1,0 +1,543 @@
+---
+title: 'CLI Commands'
+description: 'Complete reference for all Postiz CLI commands'
+---
+
+## posts:create
+
+Create and schedule a new post to one or more social media platforms.
+
+### Usage
+
+```bash
+postiz posts:create [options]
+```
+
+### Options
+
+<ParamField query="--content, -c" type="string" required>
+  Post or comment content. Can be used multiple times for threads/comments.
+  
+  ```bash
+  # Single post
+  -c "Hello World!"
+  
+  # Thread (multiple tweets)
+  -c "First tweet" -c "Second tweet" -c "Third tweet"
+  ```
+</ParamField>
+
+<ParamField query="--media, -m" type="string">
+  Comma-separated media URLs. Can be used multiple times to pair with corresponding content.
+  
+  ```bash
+  # Single image
+  -m "https://cdn.postiz.com/img1.jpg"
+  
+  # Multiple images for one post
+  -m "img1.jpg,img2.jpg,img3.jpg"
+  
+  # Different media for each content
+  -c "Main post" -m "img1.jpg" -c "Comment" -m "img2.jpg"
+  ```
+</ParamField>
+
+<ParamField query="--integrations, -i" type="string" required>
+  Comma-separated list of integration IDs. Get IDs from `integrations:list`.
+  
+  ```bash
+  # Single platform
+  -i "twitter-123"
+  
+  # Multiple platforms
+  -i "twitter-123,linkedin-456,facebook-789"
+  ```
+</ParamField>
+
+<ParamField query="--date, -s" type="string" required>
+  Schedule date in ISO 8601 format. Required even for drafts.
+  
+  ```bash
+  -s "2024-12-31T12:00:00Z"
+  ```
+</ParamField>
+
+<ParamField query="--type, -t" type="string" default="schedule">
+  Post type: `schedule` or `draft`.
+  
+  ```bash
+  -t schedule  # Schedule for publication
+  -t draft     # Save as draft
+  ```
+</ParamField>
+
+<ParamField query="--delay, -d" type="number" default="5000">
+  Delay in milliseconds between comments/thread items.
+  
+  ```bash
+  -d 2000  # 2 second delay
+  ```
+</ParamField>
+
+<ParamField query="--shortLink" type="boolean" default="true">
+  Use short links in post content.
+  
+  ```bash
+  --shortLink false  # Disable short links
+  ```
+</ParamField>
+
+<ParamField query="--settings" type="string">
+  Platform-specific settings as JSON string.
+  
+  ```bash
+  --settings '{"subreddit":[{"value":{"subreddit":"programming"}}]}'
+  ```
+</ParamField>
+
+<ParamField query="--json, -j" type="string">
+  Path to JSON file with full post structure. Overrides all other options.
+  
+  ```bash
+  --json ./post.json
+  ```
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```bash Simple Post
+postiz posts:create \
+  -c "Hello World!" \
+  -s "2024-12-31T12:00:00Z" \
+  -i "twitter-123"
+```
+
+```bash Post with Media
+postiz posts:create \
+  -c "Check out these photos!" \
+  -m "img1.jpg,img2.jpg" \
+  -s "2024-12-31T12:00:00Z" \
+  -i "twitter-123"
+```
+
+```bash Twitter Thread
+postiz posts:create \
+  -c "1/3 First tweet" \
+  -c "2/3 Second tweet" \
+  -c "3/3 Final tweet" \
+  -d 2000 \
+  -s "2024-12-31T12:00:00Z" \
+  -i "twitter-123"
+```
+
+```bash Multi-Platform
+postiz posts:create \
+  -c "Hello from all platforms!" \
+  -s "2024-12-31T12:00:00Z" \
+  -i "twitter-123,linkedin-456,facebook-789"
+```
+
+```bash Draft Post
+postiz posts:create \
+  -c "Draft content" \
+  -s "2024-12-31T12:00:00Z" \
+  -t draft \
+  -i "twitter-123"
+```
+
+```bash Reddit with Settings
+postiz posts:create \
+  -c "Post content" \
+  -s "2024-12-31T12:00:00Z" \
+  --settings '{"subreddit":[{"value":{"subreddit":"programming","title":"My Title","type":"text"}}]}' \
+  -i "reddit-123"
+```
+
+```bash From JSON File
+postiz posts:create --json ./post.json
+```
+
+</CodeGroup>
+
+---
+
+## posts:list
+
+List scheduled and published posts within a date range.
+
+### Usage
+
+```bash
+postiz posts:list [options]
+```
+
+### Options
+
+<ParamField query="--startDate" type="string">
+  Start date in ISO 8601 format. Default: 30 days ago.
+  
+  ```bash
+  --startDate "2024-01-01T00:00:00Z"
+  ```
+</ParamField>
+
+<ParamField query="--endDate" type="string">
+  End date in ISO 8601 format. Default: 30 days from now.
+  
+  ```bash
+  --endDate "2024-12-31T23:59:59Z"
+  ```
+</ParamField>
+
+<ParamField query="--customer" type="string">
+  Filter by customer ID (for multi-tenant setups).
+  
+  ```bash
+  --customer "customer-123"
+  ```
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```bash Default Range
+# Lists posts from last 30 days to next 30 days
+postiz posts:list
+```
+
+```bash Custom Range
+postiz posts:list \
+  --startDate "2024-01-01T00:00:00Z" \
+  --endDate "2024-12-31T23:59:59Z"
+```
+
+```bash Customer Filter
+postiz posts:list --customer "customer-123"
+```
+
+```bash Parse with jq
+# Get only post IDs
+postiz posts:list | jq '.posts[].id'
+
+# Count scheduled posts
+postiz posts:list | jq '[.posts[] | select(.status=="scheduled")] | length'
+```
+
+</CodeGroup>
+
+---
+
+## posts:delete
+
+Delete a scheduled or draft post by ID.
+
+### Usage
+
+```bash
+postiz posts:delete <id>
+```
+
+### Arguments
+
+<ParamField query="id" type="string" required>
+  Post ID to delete. Get from `posts:list`.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```bash Delete Single Post
+postiz posts:delete post-123
+```
+
+```bash Delete Multiple Posts
+# Using a shell script
+for id in post-123 post-456 post-789; do
+  postiz posts:delete $id
+done
+```
+
+```bash Delete Failed Posts
+# Get failed post IDs and delete them
+postiz posts:list | \
+  jq -r '.posts[] | select(.status=="failed") | .id' | \
+  xargs -I {} postiz posts:delete {}
+```
+
+</CodeGroup>
+
+---
+
+## integrations:list
+
+List all connected social media integrations.
+
+### Usage
+
+```bash
+postiz integrations:list
+```
+
+### Examples
+
+<CodeGroup>
+
+```bash List All
+postiz integrations:list
+```
+
+```bash Filter by Platform
+# Get only Twitter integrations
+postiz integrations:list | jq '.[] | select(.identifier=="twitter")'
+```
+
+```bash Get Integration IDs
+# Extract all integration IDs
+postiz integrations:list | jq -r '.[].id'
+
+# Get Twitter integration ID
+postiz integrations:list | jq -r '.[] | select(.identifier=="twitter") | .id'
+```
+
+```bash Check Active Integrations
+# Count active integrations
+postiz integrations:list | jq '[.[] | select(.disabled==false)] | length'
+```
+
+</CodeGroup>
+
+---
+
+## integrations:settings
+
+Get platform-specific settings schema for an integration.
+
+### Usage
+
+```bash
+postiz integrations:settings <id>
+```
+
+### Arguments
+
+<ParamField query="id" type="string" required>
+  Integration ID. Get from `integrations:list`.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```bash Reddit Settings
+postiz integrations:settings reddit-123
+```
+
+```bash YouTube Settings
+postiz integrations:settings youtube-456
+```
+
+```bash Parse Settings
+# Get max content length
+postiz integrations:settings twitter-123 | jq '.output.maxLength'
+
+# Get available tools
+postiz integrations:settings reddit-123 | jq '.output.tools'
+```
+
+</CodeGroup>
+
+---
+
+## integrations:trigger
+
+Trigger an integration tool to fetch additional data (e.g., subreddits, playlists).
+
+### Usage
+
+```bash
+postiz integrations:trigger <id> <method> [options]
+```
+
+### Arguments
+
+<ParamField query="id" type="string" required>
+  Integration ID. Get from `integrations:list`.
+</ParamField>
+
+<ParamField query="method" type="string" required>
+  Method name from the integration's available tools. Get from `integrations:settings`.
+</ParamField>
+
+### Options
+
+<ParamField query="--data, -d" type="string">
+  Data to pass to the tool as JSON string.
+  
+  ```bash
+  -d '{"query":"programming"}'
+  ```
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```bash Get Subreddits
+postiz integrations:trigger reddit-123 getSubreddits
+```
+
+```bash Search Subreddits
+postiz integrations:trigger reddit-123 searchSubreddits \
+  -d '{"query":"programming"}'
+```
+
+```bash Get YouTube Playlists
+postiz integrations:trigger youtube-456 getPlaylists
+```
+
+```bash Parse Tool Output
+# Extract specific fields
+postiz integrations:trigger reddit-123 getSubreddits | \
+  jq '.output[].name'
+```
+
+</CodeGroup>
+
+---
+
+## upload
+
+Upload a media file (image, video, document).
+
+### Usage
+
+```bash
+postiz upload <file>
+```
+
+### Arguments
+
+<ParamField query="file" type="string" required>
+  Path to the file to upload.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```bash Upload Image
+postiz upload ./photo.jpg
+```
+
+```bash Upload Video
+postiz upload ./video.mp4
+```
+
+```bash Upload and Use
+# Upload and extract the path
+PATH=$(postiz upload ./image.jpg | jq -r '.path')
+
+# Use in a post
+postiz posts:create \
+  -c "Check this out!" \
+  -m "$PATH" \
+  -s "2024-12-31T12:00:00Z" \
+  -i "twitter-123"
+```
+
+```bash Batch Upload
+# Upload multiple files
+for file in ./images/*.jpg; do
+  echo "Uploading $file..."
+  postiz upload "$file"
+done
+```
+
+</CodeGroup>
+
+---
+
+## Global Options
+
+### --help, -h
+
+Display help information for any command.
+
+```bash
+postiz --help
+postiz posts:create --help
+postiz integrations:list --help
+```
+
+### --version, -v
+
+Display CLI version.
+
+```bash
+postiz --version
+```
+
+---
+
+## Exit Codes
+
+The CLI uses standard exit codes:
+
+- `0` - Success
+- `1` - Error (invalid arguments, API error, authentication failure, etc.)
+
+Use exit codes in scripts:
+
+```bash
+postiz posts:create -c "Test" -s "2024-12-31T12:00:00Z" -i "twitter-123"
+
+if [ $? -eq 0 ]; then
+  echo "✅ Post created successfully"
+else
+  echo "❌ Failed to create post"
+  exit 1
+fi
+```
+
+---
+
+## Environment Variables
+
+<ResponseField name="POSTIZ_API_KEY" type="string" required>
+  Your Postiz API key. Required for all commands.
+  
+  ```bash
+  export POSTIZ_API_KEY="your_api_key_here"
+  ```
+</ResponseField>
+
+<ResponseField name="POSTIZ_API_URL" type="string">
+  Custom API URL for self-hosted instances. Default: `https://api.postiz.com`
+  
+  ```bash
+  export POSTIZ_API_URL="https://your-domain.com"
+  ```
+</ResponseField>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CLI Overview" icon="terminal" href="/api/cli/overview">
+    Learn more about the CLI
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/overview">
+    Full API documentation
+  </Card>
+  <Card title="Node.js SDK" icon="node" href="/api/sdk/nodejs-sdk">
+    Use the programmatic SDK
+  </Card>
+  <Card title="API Overview" icon="code" href="/api/overview">
+    View API documentation
+  </Card>
+</CardGroup>

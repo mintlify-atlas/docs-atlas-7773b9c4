@@ -1,0 +1,225 @@
+---
+title: 'X (Twitter) Integration'
+description: 'Connect and schedule posts to X (formerly Twitter) with advanced automation features'
+---
+
+## Overview
+
+Postiz provides comprehensive X (Twitter) integration with support for tweets, threads, media uploads, and advanced automation features like auto-reposting and engagement tracking.
+
+<Note>
+  **Business Account Note:** You will be logged into your current X account. To use a different account, switch accounts on X first before connecting.
+</Note>
+
+## Authentication
+
+X uses OAuth 1.0a authentication with write access permissions.
+
+<Steps>
+  <Step title="Connect Account">
+    Click "Connect X" in the Integrations settings
+  </Step>
+  
+  <Step title="Authorize Postiz">
+    You'll be redirected to X to authorize the application with write access
+  </Step>
+  
+  <Step title="Complete Setup">
+    After authorization, your X account will be connected and ready to use
+  </Step>
+</Steps>
+
+## Supported Features
+
+### Text Posts
+
+- **Free users**: 200 characters maximum
+- **Premium users**: 4000 characters maximum
+- Rich text formatting not supported (plain text only)
+- URL shortening handled automatically by X
+
+### Media Attachments
+
+<Tabs>
+  <Tab title="Images">
+    - **Maximum**: 4 images per tweet
+    - **Format**: JPG, PNG, GIF (converted and optimized)
+    - **Size**: Automatically resized to 1000px width
+    - **GIF Support**: Animated GIFs preserved
+  </Tab>
+  
+  <Tab title="Videos">
+    - **Maximum**: 1 video per tweet
+    - **Format**: MP4
+    - **Limitations**: Cannot mix video with images
+    - **Premium**: 2-minute limit for free users, longer for Premium
+  </Tab>
+</Tabs>
+
+<Warning>
+  **Content Rules:**
+  - Maximum 4 pictures OR maximum 1 video
+  - Cannot mix images and videos in the same tweet
+  - Posts can also be text-only without attachments
+</Warning>
+
+### Threads & Comments
+
+- Create multi-tweet threads by adding comments
+- Each comment becomes a reply to the previous tweet
+- Comments support the same media rules as main tweets
+- Threading handled automatically by Postiz
+
+### Post Settings
+
+<AccordionGroup>
+  <Accordion title="Reply Settings">
+    Control who can reply to your tweets:
+    - Everyone (default)
+    - People you follow
+    - Mentioned users only
+    - Verified users only
+    - Subscribers only
+  </Accordion>
+  
+  <Accordion title="Community Posts">
+    Post directly to X Communities by providing the community URL
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Features
+
+### Auto-Repost High-Performing Tweets
+
+Automatically repost tweets that reach a certain engagement threshold.
+
+<CodeGroup>
+```typescript Configuration
+{
+  identifier: 'x-autoRepostPost',
+  title: 'Auto Repost Posts',
+  settings: {
+    likesAmount: 100, // Minimum likes to trigger repost
+    checkInterval: 6 hours,
+    maxRuns: 3
+  }
+}
+```
+</CodeGroup>
+
+<Info>
+  **How it works:** Postiz monitors your tweets (1 week old posts only) and automatically reposts them when they reach your specified like threshold. This increases visibility and engagement.
+</Info>
+
+### Auto-Plug Posts
+
+Add promotional replies to high-performing tweets.
+
+<CodeGroup>
+```typescript Configuration
+{
+  identifier: 'x-autoPlugPost',
+  settings: {
+    likesAmount: 50,
+    plugMessage: "Your promotional message here"
+  }
+}
+```
+</CodeGroup>
+
+### Add Re-posters
+
+Automatically repost your content from multiple X accounts to increase reach.
+
+## Analytics
+
+Postiz provides comprehensive analytics for your X account:
+
+### Account Metrics
+- **Impressions**: Total tweet views
+- **Engagement**: Likes, retweets, quotes, replies
+- **Bookmarks**: Number of bookmarks
+- **Profile visits**: Track profile engagement
+
+### Per-Post Metrics
+- Impressions
+- Likes
+- Retweets
+- Replies
+- Quotes
+- Bookmarks
+- Real-time updates
+
+<Warning>
+  Analytics are disabled if `DISABLE_X_ANALYTICS` environment variable is set.
+</Warning>
+
+## Rate Limits
+
+<Info>
+  **Critical Rate Limit:** X has strict rate limits of **300 posts per 3 hours**. Postiz automatically manages this with a maxConcurrentJob setting of 1.
+</Info>
+
+### Common Errors
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| Usage capped | Rate limit exceeded | Wait before posting again |
+| Duplicate post | Already posted this content | Wait or modify content |
+| Invalid URL | URL not allowed on X | Check URL format |
+| Video too long | Video exceeds 2 minutes | Upgrade to Premium or shorten video |
+| Authentication expired | Token expired | Reconnect your account |
+
+## Mentions
+
+Mention users in your tweets with the `@username` format. Postiz provides autocomplete:
+
+1. Type `@` followed by a username
+2. Search results show matching profiles
+3. Select a user to insert the mention
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Optimal Posting Times">
+    Schedule posts during peak engagement hours (9 AM - 3 PM local time)
+  </Card>
+  
+  <Card title="Use Media Wisely">
+    Tweets with images get 150% more engagement than text-only
+  </Card>
+  
+  <Card title="Thread Strategy">
+    Use threads for detailed content - improves visibility in algorithm
+  </Card>
+  
+  <Card title="Monitor Analytics">
+    Check which content performs best and replicate successful patterns
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Authentication Issues">
+    If you see "Unsupported Authentication" errors:
+    - Disconnect and reconnect your account
+    - Ensure you're logged into the correct X account
+    - Check that you authorized write permissions
+  </Accordion>
+  
+  <Accordion title="Video Upload Failures">
+    Common video issues:
+    - Ensure video is under 2 minutes (free users)
+    - Use MP4 format only
+    - Check file size isn't too large
+    - Verify account isn't rate limited
+  </Accordion>
+  
+  <Accordion title="Duplicate Content">
+    X blocks duplicate tweets within a short timeframe:
+    - Wait at least 24 hours between identical posts
+    - Modify content slightly for reposts
+    - Use different wording or add timestamps
+  </Accordion>
+</AccordionGroup>

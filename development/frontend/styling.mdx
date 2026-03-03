@@ -1,0 +1,449 @@
+---
+title: Tailwind CSS Styling
+description: Master Tailwind CSS styling in Postiz
+---
+
+## Overview
+
+Postiz uses **Tailwind CSS 3** with a custom color system and design tokens. Before writing any component, always review the existing styles and color variables.
+
+<Warning>
+**Required Reading**: Before styling any component, check:
+- `/apps/frontend/src/app/colors.scss` - Color variables
+- `/apps/frontend/src/app/global.scss` - Global styles
+- `/apps/frontend/tailwind.config.js` - Tailwind configuration
+</Warning>
+
+## Color System
+
+### New Color Variables
+
+<Info>
+All `--color-custom*` variables are deprecated. Use the new color system.
+</Info>
+
+**Primary Colors:**
+```scss
+--color-primary         # Primary brand color
+--color-secondary       # Secondary brand color
+--color-third           # Tertiary color
+--color-forth           # Fourth level
+--color-fifth           # Fifth level
+```
+
+**New Design System:**
+```scss
+--new-bgColor           # Main background
+--new-bgColorInner      # Inner backgrounds (cards, modals)
+--new-bgLineColor       # Line backgrounds
+--new-textColor         # Primary text
+--new-btn-primary       # Primary button background
+--new-btn-simple        # Secondary button background
+--new-btn-text          # Button text color
+--new-border            # Border color
+--new-sep               # Separator color
+--new-back-drop         # Backdrop color
+```
+
+**Interactive Elements:**
+```scss
+--new-boxFocused        # Focused state
+--new-boxHover          # Hover state
+--textItemFocused       # Focused text
+--textItemBlur          # Muted/blur text
+```
+
+**Table Colors:**
+```scss
+--new-table-border      # Table borders
+--new-table-header      # Table headers
+--new-table-text        # Table text
+--new-table-text-focused # Table focused text
+```
+
+**Platform Colors:**
+```scss
+--linkedin-bg           # LinkedIn background
+--linkedin-text         # LinkedIn text
+--linkedin-border       # LinkedIn border
+--facebook-bg           # Facebook background
+--facebook-bg-comment   # Facebook comments
+--instagram-bg          # Instagram background
+--tiktok-item-bg        # TikTok item background
+--youtube-bg            # YouTube background
+--youtube-button        # YouTube button
+```
+
+### Using Colors in Tailwind
+
+```tsx
+// Background colors
+<div className="bg-newBgColor">Main background</div>
+<div className="bg-newBgColorInner">Card background</div>
+
+// Text colors
+<p className="text-newTextColor">Primary text</p>
+<p className="text-textItemBlur">Muted text</p>
+<p className="text-textItemFocused">Focused text</p>
+
+// Buttons
+<button className="bg-btnPrimary text-btnText">Primary</button>
+<button className="bg-btnSimple text-btnText">Secondary</button>
+
+// Borders
+<div className="border border-newBorder">Bordered</div>
+
+// Interactive states
+<div className="hover:bg-boxHover active:bg-boxFocused">
+  Interactive element
+</div>
+```
+
+## Tailwind Configuration
+
+### Custom Screens
+
+Postiz defines custom responsive breakpoints:
+
+```javascript tailwind.config.js
+screens: {
+  mobile: { raw: '(max-width: 1025px)' },
+  tablet: { raw: '(max-width: 1300px)' },
+  iconBreak: { raw: '(max-width: 1560px)' },
+  maxMedia: { raw: '(max-width: 1400px)' },
+  custom: { raw: '(max-height: 800px)' },
+  minCustom: { raw: '(min-height: 800px)' },
+  xs: { max: '401px' },
+}
+```
+
+**Usage:**
+```tsx
+<div className="
+  flex flex-col
+  mobile:hidden
+  tablet:flex-row
+  lg:gap-6
+">
+  Content
+</div>
+```
+
+### Custom Animations
+
+```javascript tailwind.config.js
+animation: {
+  fade: 'fadeOut 0.5s ease-in-out',
+  fadeIn: 'normalFadeIn 0.2s ease-in-out forwards',
+  fadeDown: 'fadeDown 4s ease-in-out forwards',
+  overflow: 'overFlow 0.5s ease-in-out forwards',
+  marqueeUp: 'marquee-up 100s linear infinite',
+}
+```
+
+**Usage:**
+```tsx
+<div className="animate-fadeIn">Fades in</div>
+<div className="animate-fadeDown">Fades down</div>
+```
+
+### Custom Shadows
+
+```javascript tailwind.config.js
+boxShadow: {
+  menu: 'var(--menu-shadow)',
+  previewShadow: 'var(--preview-box-shadow)',
+  yellowToast: '0px 0px 50px rgba(252, 186, 3, 0.3)',
+  greenToast: '0px 0px 50px rgba(60, 124, 90, 0.3)',
+}
+```
+
+### Custom Plugins
+
+```javascript tailwind.config.js
+plugins: [
+  require('tailwind-scrollbar'),     // Custom scrollbars
+  require('tailwindcss-rtl'),        // RTL support
+  function ({ addVariant }) {
+    addVariant('child', '& > *');           // Target direct children
+    addVariant('child-hover', '& > *:hover'); // Target hovered children
+  },
+],
+```
+
+**Usage:**
+```tsx
+// Scrollbar styling
+<div className="scrollbar scrollbar-thumb-btnPrimary scrollbar-track-newBgColor">
+
+// RTL support
+<div className="ltr:ml-4 rtl:mr-4">
+
+// Child variants
+<div className="child:p-4 child-hover:bg-boxHover">
+  <div>Child 1</div>
+  <div>Child 2</div>
+</div>
+```
+
+## Common Patterns
+
+### Layout Patterns
+
+```tsx
+// Centered container
+<div className="flex items-center justify-center min-h-screen">
+  <div className="w-full max-w-md">
+    Content
+  </div>
+</div>
+
+// Flex layouts
+<div className="flex flex-col gap-4">
+<div className="flex flex-row items-center justify-between">
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+// Full height page
+<div className="flex flex-col h-screen">
+  <header className="flex-shrink-0">Header</header>
+  <main className="flex-1 overflow-y-auto">Content</main>
+  <footer className="flex-shrink-0">Footer</footer>
+</div>
+```
+
+### Card Styling
+
+```tsx
+<div className="
+  bg-newBgColorInner
+  rounded-lg
+  border border-newBorder
+  p-6
+  shadow-lg
+  transition-all
+  hover:border-textItemFocused
+  hover:shadow-xl
+">
+  Card content
+</div>
+```
+
+### Button Styling
+
+```tsx
+// Primary button
+<button className="
+  bg-btnPrimary
+  text-btnText
+  px-4 py-2
+  rounded-lg
+  font-medium
+  transition-all
+  hover:opacity-90
+  focus:outline-none
+  focus:ring-2
+  focus:ring-btnPrimary
+  disabled:opacity-50
+  disabled:cursor-not-allowed
+">
+  Primary Action
+</button>
+
+// Secondary button
+<button className="
+  bg-btnSimple
+  text-btnText
+  px-4 py-2
+  rounded-lg
+  hover:bg-boxHover
+">
+  Secondary Action
+</button>
+```
+
+### Form Input Styling
+
+```tsx
+<input className="
+  w-full
+  px-4 py-2
+  bg-input
+  text-inputText
+  border border-newBorder
+  rounded-lg
+  placeholder:text-textItemBlur
+  focus:outline-none
+  focus:ring-2
+  focus:ring-btnPrimary
+  focus:border-transparent
+  transition-all
+" />
+```
+
+### Modal Styling
+
+```tsx
+// Backdrop
+<div className="fixed inset-0 bg-newBackdrop backdrop-blur-sm z-40" />
+
+// Modal
+<div className="
+  fixed inset-0 z-50
+  flex items-center justify-center
+  p-4
+">
+  <div className="
+    bg-newBgColorInner
+    rounded-lg
+    border border-newBorder
+    shadow-xl
+    w-full max-w-md
+    max-h-[90vh]
+    overflow-y-auto
+  ">
+    Modal content
+  </div>
+</div>
+```
+
+## Responsive Design
+
+### Mobile-First Approach
+
+```tsx
+<div className="
+  text-sm
+  md:text-base
+  lg:text-lg
+  
+  p-4
+  md:p-6
+  lg:p-8
+  
+  flex-col
+  md:flex-row
+">
+  Responsive content
+</div>
+```
+
+### Custom Breakpoints
+
+```tsx
+<div className="
+  hidden
+  mobile:block
+  tablet:hidden
+  lg:block
+">
+  Visibility based on screen size
+</div>
+```
+
+## Dark Mode
+
+Postiz uses the `dark` class on the `<body>` element:
+
+```tsx
+// Layout sets dark mode
+<body className="dark text-primary !bg-primary">
+```
+
+All color variables automatically adjust for dark mode through CSS custom properties.
+
+## Typography
+
+```tsx
+// Headings
+<h1 className="text-4xl font-bold text-newTextColor">Title</h1>
+<h2 className="text-2xl font-semibold text-newTextColor">Subtitle</h2>
+<h3 className="text-xl font-medium text-newTextColor">Section</h3>
+
+// Body text
+<p className="text-base text-newTextColor">Regular text</p>
+<p className="text-sm text-textItemBlur">Muted text</p>
+
+// Font family (Plus Jakarta Sans from Google Fonts)
+const jakartaSans = Plus_Jakarta_Sans({
+  weight: ['600', '500'],
+  style: ['normal', 'italic'],
+  subsets: ['latin'],
+});
+```
+
+## Utility Classes
+
+### Conditional Classes with clsx
+
+```tsx
+import clsx from 'clsx';
+
+<div className={clsx(
+  'base-class',
+  {
+    'active-class': isActive,
+    'disabled-class': isDisabled,
+    'error-class': hasError,
+  },
+  customClassName
+)} />
+```
+
+### Common Utilities
+
+```tsx
+// Spacing
+<div className="p-6 m-4 gap-4 space-y-2">
+
+// Flexbox
+<div className="flex items-center justify-between gap-4">
+
+// Grid
+<div className="grid grid-cols-3 gap-6">
+
+// Positioning
+<div className="relative">
+  <div className="absolute top-0 right-0">Badge</div>
+</div>
+
+// Overflow
+<div className="overflow-y-auto max-h-96">
+
+// Transitions
+<div className="transition-all duration-300 ease-in-out">
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Use new color variables">
+    Avoid deprecated `--color-custom*` variables. Use `newBgColor`, `newTextColor`, etc.
+  </Step>
+  
+  <Step title="Check existing styles">
+    Review colors.scss, global.scss, and tailwind.config.js before styling.
+  </Step>
+  
+  <Step title="Mobile-first responsive">
+    Start with mobile styles, add larger breakpoints with prefixes.
+  </Step>
+  
+  <Step title="Use semantic classes">
+    Prefer semantic color names like `bg-btnPrimary` over arbitrary values.
+  </Step>
+  
+  <Step title="Leverage custom utilities">
+    Use Postiz custom animations, shadows, and variants.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Component Architecture" icon="cubes" href="/development/frontend/components">
+    Learn component patterns
+  </Card>
+  <Card title="Creating Integrations" icon="plug" href="/development/integrations/creating-provider">
+    Build social media integrations
+  </Card>
+</CardGroup>

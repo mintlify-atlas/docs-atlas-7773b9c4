@@ -1,0 +1,304 @@
+---
+title: 'Pinterest Integration'
+description: 'Pin images, videos, and carousels to Pinterest boards with analytics'
+---
+
+## Overview
+
+Postiz integrates with Pinterest to create pins on your boards, supporting images, videos, and multi-image carousels with comprehensive analytics.
+
+<Warning>
+  **Pinterest requires at least one media attachment.** For video pins, you must provide both a video file AND a cover image (2 attachments total).
+</Warning>
+
+## Authentication
+
+Pinterest uses OAuth 2.0 with refresh tokens.
+
+<Steps>
+  <Step title="Connect Pinterest">
+    Click "Connect Pinterest" in Integrations
+  </Step>
+  
+  <Step title="Authorize">
+    Grant all requested permissions
+  </Step>
+  
+  <Step title="Select Boards">
+    Choose which boards to post to when creating pins
+  </Step>
+</Steps>
+
+### Required Permissions
+
+- `boards:read` - Read board information
+- `boards:write` - Create boards
+- `pins:read` - Read pin data
+- `pins:write` - Create pins
+- `user_accounts:read` - Access user info
+
+## Supported Features
+
+### Pin Types
+
+<Tabs>
+  <Tab title="Image Pins">
+    **Single Image:**
+    - One image per pin
+    - Title (optional)
+    - Description (500 chars)
+    - Link (optional)
+    - Board selection required
+    
+    **Image Carousel:**
+    - Multiple images in one pin
+    - Swipeable gallery format
+    - Same title/description for all
+  </Tab>
+  
+  <Tab title="Video Pins">
+    - One video per pin
+    - **Requires cover image** (2 attachments total)
+    - MP4 format
+    - Uploaded to Pinterest servers
+    - Processing time varies
+  </Tab>
+</Tabs>
+
+### Pin Settings
+
+<AccordionGroup>
+  <Accordion title="Title">
+    Optional pin title for better discovery:
+    ```typescript
+    {
+      title: "Your Pin Title"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Link">
+    Add destination URL:
+    ```typescript
+    {
+      link: "https://example.com"
+    }
+    ```
+    Users click through to your website.
+  </Accordion>
+  
+  <Accordion title="Dominant Color">
+    Set accent color for pin:
+    ```typescript
+    {
+      dominant_color: "#FF5722"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Board Selection">
+    Required - choose which board:
+    ```typescript
+    {
+      board: "board_id_12345"
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Media Handling
+
+### Image Pins
+
+Images are referenced by URL:
+
+<CodeGroup>
+```typescript Single Image
+{
+  media_source: {
+    source_type: "image_url",
+    url: "https://example.com/image.jpg"
+  }
+}
+```
+
+```typescript Image Carousel
+{
+  media_source: {
+    source_type: "multiple_image_urls",
+    items: [
+      { path: "https://example.com/image1.jpg" },
+      { path: "https://example.com/image2.jpg" }
+    ]
+  }
+}
+```
+</CodeGroup>
+
+### Video Pins
+
+Video upload is a multi-step process:
+
+<Steps>
+  <Step title="Initialize Upload">
+    Request upload URL and credentials
+  </Step>
+  
+  <Step title="Upload Video">
+    Upload video file using FormData with upload parameters
+  </Step>
+  
+  <Step title="Monitor Processing">
+    Poll media status every 30 seconds until "succeeded"
+  </Step>
+  
+  <Step title="Create Pin">
+    Create pin with video media_id and cover image URL
+  </Step>
+</Steps>
+
+<CodeGroup>
+```typescript Video Pin
+{
+  media_source: {
+    source_type: "video_id",
+    media_id: "v123456",
+    cover_image_url: "https://example.com/cover.jpg"
+  }
+}
+```
+</CodeGroup>
+
+<Warning>
+  Video pins require BOTH video and cover image. Error `cover_image_url or cover_image_content_type` means cover image is missing.
+</Warning>
+
+## Board Management
+
+List available boards:
+
+```typescript
+GET /boards
+
+Returns:
+[
+  {
+    id: "123456789",
+    name: "My Inspiration Board"
+  },
+  {
+    id: "987654321",
+    name: "Travel Ideas"
+  }
+]
+```
+
+Boards are created in Pinterest - Postiz doesn't create boards.
+
+## Analytics
+
+### Account-Level Analytics
+
+Track overall performance over time:
+
+- **Pin Click Rate**: CTR percentage
+- **Impressions**: Total pin views
+- **Pin Clicks**: Click-throughs
+- **Engagement**: Saves, clicks, etc.
+- **Saves**: Pin saves to boards
+
+Data broken down by day.
+
+### Pin-Level Analytics
+
+Detailed metrics per pin (lifetime):
+
+- **Impressions**: Total views
+- **Pin Clicks**: Clicks on pin
+- **Outbound Clicks**: Clicks to destination URL
+- **Saves**: Times saved to boards
+
+<CodeGroup>
+```typescript Analytics Example
+{
+  "label": "Impressions",
+  "percentageChange": 0,
+  "data": [
+    {
+      "total": "1523",
+      "date": "2024-03-15"
+    }
+  ]
+}
+```
+</CodeGroup>
+
+<Info>
+  Pin analytics use a 2-year lookback period to capture lifetime metrics for older pins.
+</Info>
+
+## Rate Limits
+
+<Info>
+  **Pinterest Rate Limits:**
+  - 3 concurrent posting jobs
+  - Generous API limits
+  - No strict daily pin limits
+  - Video processing adds time
+</Info>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Image Size">
+    Use 1000x1500px (2:3 ratio) for optimal display
+  </Card>
+  
+  <Card title="Description Length">
+    Use full 500 characters with keywords for SEO
+  </Card>
+  
+  <Card title="Pin to Relevant Boards">
+    Choose boards that match your content theme
+  </Card>
+  
+  <Card title="Add Links">
+    Pins with links drive 3x more traffic
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Cover Image Required Error">
+    For video pins:
+    - Must provide exactly 2 attachments
+    - First attachment: video (MP4)
+    - Second attachment: cover image (JPG/PNG)
+    - Cover image shows before video plays
+  </Accordion>
+  
+  <Accordion title="Video Processing Stuck">
+    If video processing doesn't complete:
+    - Check video format is MP4
+    - Verify file size isn't too large
+    - Processing can take 5-10 minutes
+    - If stuck over 30 minutes, retry
+  </Accordion>
+  
+  <Accordion title="Board Not Found">
+    If board isn't listed:
+    - Create board in Pinterest first
+    - Refresh integration
+    - Verify board permissions
+    - Check board isn't deleted
+  </Accordion>
+  
+  <Accordion title="Analytics Not Loading">
+    Analytics issues:
+    - New pins need 24-48 hours for data
+    - Check date range covers pin creation
+    - Some metrics may be zero initially
+    - API may have temporary delays
+  </Accordion>
+</AccordionGroup>

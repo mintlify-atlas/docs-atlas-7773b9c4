@@ -1,0 +1,487 @@
+---
+title: 'Calendar View'
+description: 'Visual calendar interface with drag-and-drop scheduling and multiple view modes'
+---
+
+## Overview
+
+The Postiz Calendar is your command center for managing all scheduled social media content. It provides a visual, interactive interface for viewing, creating, editing, and rescheduling posts across all your connected channels.
+
+## Calendar Views
+
+Postiz offers multiple calendar views to help you manage your content effectively:
+
+<Tabs>
+  <Tab title="Week View">
+    The default view shows a full week with hourly time slots. Perfect for detailed planning and visualizing your posting schedule.
+    
+    ```typescript
+    // Week view displays 7 days with hourly rows
+    const currentWeek = dayjs.utc(startDate);
+    const days = Array.from({ length: 7 }, (_, i) => 
+      currentWeek.add(i, 'day')
+    );
+    ```
+  </Tab>
+  
+  <Tab title="Day View">
+    Focus on a single day with detailed hourly breakdown. Ideal for managing high-volume posting days.
+    
+    ```typescript
+    // Day view shows 24 hours with time slot groupings
+    const options = sortBy(
+      groupBy(posts, (p) => p.time),
+      (p) => p[0].time
+    );
+    ```
+  </Tab>
+  
+  <Tab title="Month View">
+    See your entire month at a glance. Great for long-term content planning.
+    
+    <Info>
+      Month view shows post counts per day. Click any day to see detailed posts.
+    </Info>
+  </Tab>
+</Tabs>
+
+## Calendar Interface Components
+
+### Left Sidebar - Channel List
+
+The left sidebar displays all your connected social media channels:
+
+```typescript
+interface Integration {
+  id: string;
+  name: string;           // Channel name
+  identifier: string;     // Platform type: 'x', 'linkedin', 'facebook'
+  picture: string;        // Profile picture
+  disabled: boolean;      // Channel status
+  inBetweenSteps: boolean; // Setup incomplete
+  refreshNeeded: boolean;  // Token expired
+  time: Array<{ time: number }>; // Time slots
+}
+```
+
+<Accordion title="Channel Status Indicators">
+  - **Active** - Channel is connected and ready
+  - **Disabled** - Channel is temporarily disabled
+  - **Setup Incomplete** - Orange warning indicator
+  - **Refresh Needed** - Red indicator, click to reconnect
+  
+  ```typescript
+  {(integration.inBetweenSteps || integration.refreshNeeded) && (
+    <div className="bg-red-500 w-[15px] h-[15px] rounded-full">
+      !
+    </div>
+  )}
+  ```
+</Accordion>
+
+### Main Calendar Grid
+
+The calendar grid displays posts organized by date and time:
+
+<Steps>
+  <Step title="Time Rows">
+    Each row represents a time slot (hour in week view, time slot in day view).
+    
+    ```typescript
+    // Hours are generated for 24-hour display
+    export const hours = Array.from({ length: 24 }, (_, i) => i);
+    
+    // Convert to local format (12h or 24h)
+    const convertTimeFormatBasedOnLocality = (time: number) => {
+      if (isUSCitizen()) {
+        return `${time === 12 ? 12 : time % 12}:00 ${time >= 12 ? 'PM' : 'AM'}`;
+      }
+      return `${time}:00`;
+    };
+    ```
+  </Step>
+  
+  <Step title="Post Cards">
+    Posts appear as cards in the calendar grid with preview content.
+    
+    <Tabs>
+      <Tab title="Scheduled Posts">
+        ```typescript
+        interface Post {
+          id: string;
+          group: string;           // Groups related posts
+          content: string;
+          publishDate: string;     // ISO date string
+          state: State;           // DRAFT, SCHEDULED, PUBLISHED, etc.
+          integration: {
+            id: string;
+            name: string;
+            picture: string;
+            providerIdentifier: string;
+          };
+          image?: Array<{
+            id: string;
+            path: string;
+          }>;
+        }
+        ```
+      </Tab>
+      
+      <Tab title="Post States">
+        Posts are color-coded by state:
+        - **Scheduled** - Default color
+        - **Publishing** - Loading indicator
+        - **Published** - Success state
+        - **Error** - Red indicator with retry option
+      </Tab>
+    </Tabs>
+  </Step>
+</Steps>
+
+## Drag-and-Drop Scheduling
+
+Reschedule posts by dragging them to new time slots:
+
+### Setting Up Drag Source
+
+```typescript
+import { useDrag } from 'react-dnd';
+
+const [{ isDragging }, drag] = useDrag(() => ({
+  type: 'post',
+  item: {
+    post,
+    oldDate: post.publishDate
+  },
+  collect: (monitor) => ({
+    isDragging: monitor.isDragging()
+  })
+}));
+```
+
+### Setting Up Drop Target
+
+```typescript
+import { useDrop } from 'react-dnd';
+
+const [{ isOver, canDrop }, drop] = useDrop(() => ({
+  accept: 'post',
+  drop: async (item: { post: Post }) => {
+    // Calculate new date from drop position
+    const newDate = calculateNewDate(day, hour);
+    
+    // Update via API
+    await fetch(`/posts/${item.post.id}/date`, {
+      method: 'PUT',
+      body: JSON.stringify({ 
+        date: newDate,
+        action: 'update'
+      })
+    });
+    
+    // Refresh calendar
+    reloadCalendarView();
+  },
+  collect: (monitor) => ({
+    isOver: monitor.isOver(),
+    canDrop: monitor.canDrop()
+  })
+}));
+```
+
+<Warning>
+  Posts cannot be dragged to past dates or times. The drop zone will indicate if a slot is invalid.
+</Warning>
+
+## Post Interactions
+
+### Context Menu Actions
+
+Right-click or click on any post to access actions:
+
+```typescript
+const usePostActions = () => {
+  const editPost = useCallback((post) => async () => {
+    // Fetch full post data
+    const data = await fetch(`/posts/group/${post.group}`).json();
+    
+    // Open edit modal
+    modal.openModal({
+      children: <AddEditModal 
+        existingData={data}
+        integrations={[integration]}
+        date={dayjs.utc(post.publishDate).local()}
+      />
+    });
+  }, []);
+  
+  const deletePost = useCallback((post) => async () => {
+    if (!await deleteDialog('Delete this post?')) return;
+    
+    await fetch(`/posts/${post.group}`, {
+      method: 'DELETE'
+    });
+    
+    mutate();
+  }, []);
+  
+  const duplicatePost = useCallback((post) => async () => {
+    // Load post data
+    const data = await fetch(`/posts/group/${post.group}`).json();
+    
+    // Find next available slot
+    const { date } = await fetch('/posts/find-slot').json();
+    
+    // Open with pre-filled content but new date
+    modal.openModal({
+      children: <AddEditModal 
+        onlyValues={data.posts}
+        date={dayjs.utc(date).local()}
+      />
+    });
+  }, []);
+  
+  const viewStatistics = useCallback((postId) => () => {
+    modal.openModal({
+      children: <StatisticsModal postId={postId} />
+    });
+  }, []);
+  
+  return { editPost, deletePost, duplicatePost, viewStatistics };
+};
+```
+
+### Keyboard Shortcuts
+
+<Accordion title="Available Shortcuts">
+  - **Delete** - Delete selected post (after confirmation)
+  - **Escape** - Close modal or deselect post
+  - **Arrow Keys** - Navigate between posts (coming soon)
+  - **Ctrl/Cmd + D** - Duplicate selected post (coming soon)
+</Accordion>
+
+## Calendar Navigation
+
+### Date Navigation
+
+```typescript
+const CalendarNavigation = () => {
+  const { startDate, setStartDate } = useCalendar();
+  
+  const previousWeek = () => {
+    setStartDate(dayjs(startDate).subtract(7, 'days'));
+  };
+  
+  const nextWeek = () => {
+    setStartDate(dayjs(startDate).add(7, 'days'));
+  };
+  
+  const today = () => {
+    setStartDate(dayjs().startOf('week'));
+  };
+  
+  return (
+    <div className="flex gap-2">
+      <button onClick={previousWeek}>← Previous</button>
+      <button onClick={today}>Today</button>
+      <button onClick={nextWeek}>Next →</button>
+    </div>
+  );
+};
+```
+
+### Quick Date Picker
+
+Click the date header to open a date picker for quick navigation:
+
+```typescript
+<DatePicker
+  value={startDate}
+  onChange={(date) => setStartDate(date)}
+  minDate={dayjs().subtract(1, 'year')}
+  maxDate={dayjs().add(1, 'year')}
+/>
+```
+
+## Filtering and Searching
+
+Filter the calendar view by various criteria:
+
+### Channel Filter
+
+```typescript
+const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
+
+// Filter posts by selected channels
+const filteredPosts = posts.filter(post => 
+  selectedChannels.length === 0 || 
+  selectedChannels.includes(post.integration.id)
+);
+```
+
+### Tag Filter
+
+```typescript
+// GET /posts/tags - Fetch available tags
+const { tags } = await fetch('/posts/tags').json();
+
+// Filter by tags
+const filteredByTag = posts.filter(post => 
+  post.tags?.some(tag => selectedTags.includes(tag.id))
+);
+```
+
+### State Filter
+
+<Tabs>
+  <Tab title="All States">
+    Show all posts regardless of state
+  </Tab>
+  <Tab title="Scheduled Only">
+    ```typescript
+    const scheduledPosts = posts.filter(p => 
+      p.state === State.SCHEDULED
+    );
+    ```
+  </Tab>
+  <Tab title="Published Only">
+    ```typescript
+    const publishedPosts = posts.filter(p => 
+      p.state === State.PUBLISHED
+    );
+    ```
+  </Tab>
+  <Tab title="Failed Only">
+    ```typescript
+    const failedPosts = posts.filter(p => 
+      p.state === State.ERROR
+    );
+    ```
+  </Tab>
+</Tabs>
+
+## Real-time Updates
+
+The calendar automatically refreshes to show the latest post states:
+
+```typescript
+// Polling interval for calendar updates
+const { interval } = useInterval(() => {
+  reloadCalendarView();
+}, 30000); // Refresh every 30 seconds
+
+// Manual refresh
+const refreshCalendar = useCallback(() => {
+  mutate(); // SWR revalidate
+}, []);
+```
+
+<Info>
+  The calendar polls for updates every 30 seconds when the tab is active. This ensures you always see the latest post states without manual refreshing.
+</Info>
+
+## Channel Management in Calendar
+
+### Adding Channels
+
+```typescript
+const addChannel = () => {
+  modal.openModal({
+    title: 'Add Channel',
+    children: <AddProviderButton onSuccess={mutate} />
+  });
+};
+```
+
+### Organizing Channels
+
+Drag channels to reorder them in the sidebar:
+
+```typescript
+const [{ isDragging }, drag] = useDrag({
+  type: 'menu',
+  item: { id: integration.id }
+});
+
+const [{ isOver }, drop] = useDrop({
+  accept: 'menu',
+  drop: (item: { id: string }) => {
+    changeItemGroup(item.id, group.id);
+  }
+});
+```
+
+## Calendar Context API
+
+The calendar uses React Context for state management:
+
+```typescript
+interface CalendarContextType {
+  startDate: string;
+  setStartDate: (date: string) => void;
+  posts: Post[];
+  integrations: Integration[];
+  reloadCalendarView: () => void;
+  loading: boolean;
+}
+
+const CalendarContext = createContext<CalendarContextType>();
+
+export const useCalendar = () => {
+  const context = useContext(CalendarContext);
+  if (!context) {
+    throw new Error('useCalendar must be used within CalendarProvider');
+  }
+  return context;
+};
+```
+
+## Performance Optimization
+
+<Accordion title="Calendar Optimization Techniques">
+  1. **Virtualization** - Only render visible time slots
+  2. **Memoization** - Cache post calculations
+  3. **Debounced Drag** - Reduce update frequency during dragging
+  4. **Lazy Loading** - Load posts only for visible date range
+  
+  ```typescript
+  const visiblePosts = useMemo(() => {
+    return posts.filter(post => {
+      const date = dayjs(post.publishDate);
+      return date.isAfter(startDate) && 
+             date.isBefore(endDate);
+    });
+  }, [posts, startDate, endDate]);
+  ```
+</Accordion>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Week View for Planning" icon="calendar-week">
+    Week view gives you the best overview for content planning and scheduling.
+  </Card>
+  
+  <Card title="Organize Channels by Priority" icon="arrow-down-short-wide">
+    Drag channels to reorder them with most important channels at the top.
+  </Card>
+  
+  <Card title="Set Up Time Slots" icon="clock">
+    Configure time slots for each channel to enable smart auto-scheduling.
+  </Card>
+  
+  <Card title="Use Filters Effectively" icon="filter">
+    Filter by channel or state to focus on specific content.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Post Scheduling" icon="calendar-plus" href="/features/scheduling">
+    Learn how to create and schedule posts
+  </Card>
+  <Card title="Analytics" icon="chart-line" href="/features/analytics">
+    Track performance of your scheduled posts
+  </Card>
+</CardGroup>

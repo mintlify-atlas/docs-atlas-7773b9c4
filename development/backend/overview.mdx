@@ -1,0 +1,288 @@
+---
+title: Backend Development Overview
+description: Understanding backend architecture and development patterns in Postiz
+---
+
+## Overview
+
+The Postiz backend is built with **NestJS 10**, following enterprise-grade architectural patterns and best practices. It provides a robust REST API that handles authentication, post management, integrations, and more.
+
+## Architecture Principles
+
+### Layered Architecture
+
+<Warning>
+**Critical Rule**: When working on the backend, you must always follow the 3-layer pattern:
+
+**Controller → Service → Repository**
+
+Never skip layers. In some cases, there's a 4-layer pattern:
+
+**Controller → Manager → Service → Repository**
+</Warning>
+
+```
+┌─────────────────────────────────────────┐
+│           Controllers Layer               │
+│  (apps/backend/src/api/routes)          │
+│  - HTTP request handling                 │
+│  - Request validation                    │
+│  - Response formatting                   │
+└─────────────────────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────┐
+│            Services Layer                 │
+│  (libraries/nestjs-libraries/services)  │
+│  - Business logic                        │
+│  - Data transformation                   │
+│  - Orchestration                         │
+└─────────────────────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────┐
+│          Repository Layer                │
+│  (libraries/nestjs-libraries/database)  │
+│  - Database access (Prisma)              │
+│  - Data persistence                      │
+│  - Query optimization                    │
+└─────────────────────────────────────────┘
+```
+
+### Code Organization
+
+<Info>
+**Important**: Most of the server logic lives in `libraries/nestjs-libraries/src/services`.
+
+The backend repository (`apps/backend`) is mostly used to write controllers and import files from `libraries/nestjs-libraries`.
+</Info>
+
+## Project Structure
+
+```
+apps/backend/
+├── src/
+│   ├── api/
+│   │   ├── routes/              # Controllers
+│   │   │   ├── auth.controller.ts
+│   │   │   ├── posts.controller.ts
+│   │   │   ├── analytics.controller.ts
+│   │   │   └── integrations.controller.ts
+│   │   └── api.module.ts       # API module
+│   ├── services/               # Application-specific services
+│   │   └── auth/
+│   │       ├── auth.service.ts
+│   │       └── providers/
+│   ├── public-api/            # Public API (no auth)
+│   ├── app.module.ts          # Root module
+│   └── main.ts                # Entry point
+└── dist/                      # Build output
+
+libraries/nestjs-libraries/src/
+├── services/                  # Shared services (business logic)
+├── database/                 # Prisma and repositories
+├── integrations/            # Social media integrations
+├── dtos/                    # Data transfer objects
+└── ... (other shared modules)
+```
+
+## Main Application Module
+
+The root application module configures all global services:
+
+```typescript apps/backend/src/app.module.ts
+import { Global, Module } from '@nestjs/common';
+import { DatabaseModule } from '@gitroom/nestjs-libraries/database/prisma/database.module';
+import { ApiModule } from '@gitroom/backend/api/api.module';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+import { PoliciesGuard } from '@gitroom/backend/services/auth/permissions/permissions.guard';
+
+@Global()
+@Module({
+  imports: [
+    DatabaseModule,           // Prisma database
+    ApiModule,                // API routes
+    ThrottlerModule.forRoot({ // Rate limiting
+      throttlers: [{
+        ttl: 3600000,
+        limit: 30,
+      }],
+    }),
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: PoliciesGuard,  // Global auth guard
+    },
+  ],
+})
+export class AppModule {}
+```
+
+## Key Features
+
+### Authentication & Authorization
+
+- **JWT-based authentication** with cookie storage
+- **CASL** for permission management
+- **OAuth 2.0** for social media integrations
+- **Rate limiting** via Redis-backed throttler
+
+### Request Handling
+
+- **Swagger/OpenAPI** documentation
+- **Class validator** for DTO validation
+- **Transformation pipes** for data sanitization
+- **Exception filters** for error handling
+
+### External Services
+
+- **Temporal integration** for background jobs
+- **Redis** for caching and sessions
+- **S3** for file storage
+- **Sentry** for error monitoring
+
+## Development Workflow
+
+<Steps>
+  <Step title="Start development server">
+    ```bash
+    pnpm dev:backend
+    ```
+    Runs on `http://localhost:3000` (or configured port)
+  </Step>
+  
+  <Step title="Watch for changes">
+    The dev server uses nodemon for hot-reloading on file changes
+  </Step>
+  
+  <Step title="Access Swagger docs">
+    API documentation available at `http://localhost:3000/api`
+  </Step>
+</Steps>
+
+## Environment Variables
+
+Key environment variables for backend:
+
+```bash .env
+# Database
+DATABASE_URL="postgresql://user:password@localhost:5432/postiz"
+
+# Redis
+REDIS_URL="redis://localhost:6379"
+
+# JWT
+JWT_SECRET="your-secret-key"
+
+# Frontend URL (for CORS)
+FRONTEND_URL="http://localhost:5173"
+
+# API Rate Limiting
+API_LIMIT=30
+
+# Disable Registration
+DISABLE_REGISTRATION=false
+
+# Email
+EMAIL_PROVIDER="resend"  # or nodemailer
+```
+
+## Global Guards & Middleware
+
+### Authentication Guard
+
+The `PoliciesGuard` is applied globally to protect routes:
+
+```typescript
+@Global()
+@Module({
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: PoliciesGuard,
+    },
+  ],
+})
+```
+
+### Rate Limiting
+
+```typescript
+ThrottlerModule.forRoot({
+  throttlers: [
+    {
+      ttl: 3600000,      // 1 hour
+      limit: 30,          // 30 requests per hour
+    },
+  ],
+  storage: new ThrottlerStorageRedisService(ioRedis),
+})
+```
+
+### CORS Configuration
+
+```typescript main.ts
+app.enableCors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true,
+});
+```
+
+## API Documentation
+
+Swagger is configured for automatic API documentation:
+
+```typescript main.ts
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+
+const config = new DocumentBuilder()
+  .setTitle('Postiz API')
+  .setDescription('Social media scheduling API')
+  .setVersion('1.0')
+  .addBearerAuth()
+  .build();
+
+const document = SwaggerModule.createDocument(app, config);
+SwaggerModule.setup('api', app, document);
+```
+
+## Error Handling
+
+Sentry integration for error monitoring:
+
+```typescript
+import { SentryModule } from '@sentry/nestjs/setup';
+
+@Module({
+  imports: [
+    SentryModule.forRoot(),
+    // ... other modules
+  ],
+})
+```
+
+## Best Practices
+
+<Note>
+1. **Always follow the layered architecture** - Never skip layers
+2. **Put business logic in services** - Controllers should be thin
+3. **Use DTOs for validation** - Validate all incoming data
+4. **Import from shared libraries** - Reuse code from `libraries/nestjs-libraries`
+5. **Use dependency injection** - Constructor injection for all dependencies
+6. **Handle errors properly** - Use NestJS exception filters
+7. **Document with Swagger** - Use `@ApiTags`, `@ApiOperation` decorators
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Controller Patterns" icon="route" href="/development/backend/controllers">
+    Learn how to write controllers
+  </Card>
+  <Card title="Service Layer" icon="cog" href="/development/backend/services">
+    Understand service patterns
+  </Card>
+  <Card title="Database Schema" icon="database" href="/development/backend/database-schema">
+    Explore the database structure
+  </Card>
+</CardGroup>
